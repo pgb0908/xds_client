@@ -37,7 +37,11 @@ public:
         std::thread writer([stream](){
             // do
             DiscoveryRequest discoveryRequest;
-            discoveryRequest.set
+            discoveryRequest.mutable_version_info()->append("");
+            auto node_data = discoveryRequest.mutable_node();
+            node_data->mutable_cluster()->append("test-cluster");
+            node_data->mutable_id()->append("test-id");
+            discoveryRequest.mutable_type_url()->append("type.googleapis.com/envoy.config.cluster.v3.Cluster");
             stream->Write(discoveryRequest);
 
             stream->WritesDone();
