@@ -1,6 +1,4 @@
 #include <iostream>
-#include "../schema/greetings_server.h"
-#include "../schema/greetings_client.h"
 #include <thread>
 
 /*
@@ -19,9 +17,13 @@ int main() {
     return 0;
 }*/
 
+#include "../schema/AdsClient.h"
 
 int main(){
+    AdsClient adsClient(grpc::CreateChannel("192.168.56.101:18000",
+                                            grpc::InsecureChannelCredentials()));
 
+    adsClient.AggregatedDiscoveryService();
 
     return 0;
 }

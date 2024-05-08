@@ -36,10 +36,6 @@ endif()
 
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-set(EXAMPLE_DIR "${ROOT_DIR}/greetings")
-include_directories(${EXAMPLE_DIR})
-
-
 
 add_subdirectory(schema)
 add_subdirectory(src)

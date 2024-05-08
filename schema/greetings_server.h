@@ -10,7 +10,7 @@
 #include <string>
 
 #include <grpc++/grpc++.h>
-#include "proto-src/greetings.grpc.pb.h"
+//#include "proto-src/greetings.grpc.pb.h"
 
 
 // Logic and data behind the server's behavior.

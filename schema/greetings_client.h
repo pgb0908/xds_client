@@ -13,7 +13,7 @@
 
 #include <grpc++/grpc++.h>
 
-#include "proto-src/greetings.grpc.pb.h"
+//#include "proto-src/greetings.grpc.pb.h"
 
 using grpc::Channel;
 using grpc::ClientContext;

@@ -40,8 +40,6 @@ grpc_generate_cpp(grpc_srcs grpc_hdrs ${PROTO_SRC_DIR} ${proto})]]
 
 include_directories(CURRENT_DIR)
 add_library(target STATIC
-        #greetings_server.cpp
-        #greetings_client.cpp
         AdsClient.cpp
         ${proto_srcs}
         ${grpc_srcs}

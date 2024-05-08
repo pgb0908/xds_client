@@ -19,6 +19,7 @@ using envoy::service::discovery::v3::AggregatedDiscoveryService;
 using envoy::service::discovery::v3::DiscoveryRequest;
 using envoy::service::discovery::v3::DiscoveryResponse;
 
+
 class AdsClient {
 public:
     // Constructor
@@ -36,6 +37,7 @@ public:
         std::thread writer([stream](){
             // do
             DiscoveryRequest discoveryRequest;
+            discoveryRequest.set
             stream->Write(discoveryRequest);
 
             stream->WritesDone();
@@ -43,7 +45,12 @@ public:
 
         DiscoveryResponse discoveryResponse;
         while(stream->Read(&discoveryResponse)){
+            std::cout << "Get message : " << discoveryResponse.version_info();
 
+            for (const auto& resource : discoveryResponse.resources()) {
+                std::cout << "Resource Type URL: " << resource.type_url() << std::endl;
+                std::cout << "Resource Type value: " << resource.value().c_str() << std::endl;
+            }
         }
 
         writer.join();
