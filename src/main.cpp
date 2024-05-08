@@ -3,6 +3,7 @@
 #include "../schema/greetings_client.h"
 #include <thread>
 
+/*
 void start_server(){
     greetings_server gs;
     gs.RunServer();
@@ -14,6 +15,13 @@ int main() {
 
     greeting_client gc;
     gc.interativeGRPC();
+
+    return 0;
+}*/
+
+
+int main(){
+
 
     return 0;
 }
