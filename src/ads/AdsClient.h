@@ -5,10 +5,10 @@
 #ifndef XDS_CLIENT_ADSCLIENT_H
 #define XDS_CLIENT_ADSCLIENT_H
 
-#include "proto-src/xds.grpc.pb.h"
 #include <grpc++/grpc++.h>
 #include <thread>
 #include "memory"
+#include "../../schema/proto-src/xds.grpc.pb.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -31,6 +31,7 @@ public:
 
         std::shared_ptr<grpc::ClientReaderWriter<DiscoveryRequest, DiscoveryResponse>>
                     stream(stub_->StreamAggregatedResources(&context));
+
 
         std::thread writer([stream](){
             // do

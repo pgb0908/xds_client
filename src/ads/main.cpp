@@ -17,8 +17,8 @@ int main() {
     return 0;
 }*/
 
-#include "../schema/AdsClient.h"
-#include "../schema/AsyncAdsClient.h"
+#include "../ads/AdsClient.h"
+#include "AsyncAdsClient.h"
 
 int main(){
 /*    AdsClient adsClient(grpc::CreateChannel("192.168.56.101:18000",

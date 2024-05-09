@@ -13,8 +13,7 @@
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
 
-#include "proto-src/xds.grpc.pb.h"
-#include "proto-src/xds.pb.h"
+#include "../../schema/proto-src/xds.grpc.pb.h"
 
 #include <thread>
 #include "memory"

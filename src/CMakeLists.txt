@@ -1,4 +1,2 @@
-find_package(Threads)
-add_executable(main main.cpp)
-target_link_libraries(main PUBLIC
-        target Threads::Threads)
+add_subdirectory(ads)
+add_subdirectory(asnyc_ads)

@@ -39,7 +39,6 @@ void AsyncAdsClient::do_something() {
                     std::cout << "  Resource Type URL: " << resource.type_url() << std::endl;
                     std::cout << "  Resource Type value: " << resource.value().c_str() << std::endl;
                 }
-                std::cout << "=============================================" << std::endl;
 
                 StartRead(&response_);
             }
@@ -69,7 +68,6 @@ void AsyncAdsClient::do_something() {
                 for (const auto& resource : request.resource_names()) {
                     std::cout << "  Resource: " << resource << std::endl;
                 }
-                std::cout << "==========================================" << std::endl;
 
                 StartWrite(&request);
                 requests_iterator_++;
