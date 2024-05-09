@@ -18,12 +18,17 @@ int main() {
 }*/
 
 #include "../schema/AdsClient.h"
+#include "../schema/AsyncAdsClient.h"
 
 int main(){
-    AdsClient adsClient(grpc::CreateChannel("192.168.56.101:18000",
+/*    AdsClient adsClient(grpc::CreateChannel("192.168.56.101:18000",
+                                            grpc::InsecureChannelCredentials()));*/
+    //adsClient.AggregatedDiscoveryService();
+
+    AsyncAdsClient adsClient(grpc::CreateChannel("192.168.56.101:18000",
                                             grpc::InsecureChannelCredentials()));
 
-    adsClient.AggregatedDiscoveryService();
+    adsClient.do_something();
 
     return 0;
 }

@@ -24,9 +24,7 @@ class AdsClient {
 public:
     // Constructor
     AdsClient(const std::shared_ptr<Channel>& channel)
-        : stub_(AggregatedDiscoveryService::NewStub(channel)) {
-
-    }
+        : stub_(AggregatedDiscoveryService::NewStub(channel)) {}
 
     void AggregatedDiscoveryService(){
         ClientContext context;
@@ -42,6 +40,8 @@ public:
             node_data->mutable_cluster()->append("test-cluster");
             node_data->mutable_id()->append("test-id");
             discoveryRequest.mutable_type_url()->append("type.googleapis.com/envoy.config.cluster.v3.Cluster");
+            //discoveryRequest.mutable_type_url()->append("type.googleapis.com/envoy.config.route.v3.RouteConfiguration");
+            //discoveryRequest.mutable_type_url()->append("type.googleapis.com/envoy.api.v3.Cluster");
             stream->Write(discoveryRequest);
 
             stream->WritesDone();
@@ -49,11 +49,14 @@ public:
 
         DiscoveryResponse discoveryResponse;
         while(stream->Read(&discoveryResponse)){
-            std::cout << "Get message : " << discoveryResponse.version_info();
+            std::cout << "version-info : " << discoveryResponse.version_info() << std::endl;
+            std::cout << "nonce : " << discoveryResponse.nonce() << std::endl;
+            std::cout << "type-url : " << discoveryResponse.type_url() << std::endl;
 
+            std::cout << "Resources : "  << std::endl;
             for (const auto& resource : discoveryResponse.resources()) {
-                std::cout << "Resource Type URL: " << resource.type_url() << std::endl;
-                std::cout << "Resource Type value: " << resource.value().c_str() << std::endl;
+                std::cout << "  Resource Type URL: " << resource.type_url() << std::endl;
+                std::cout << "  Resource Type value: " << resource.value().c_str() << std::endl;
             }
         }
 
