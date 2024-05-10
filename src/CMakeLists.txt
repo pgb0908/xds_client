@@ -1,2 +1,3 @@
 add_subdirectory(ads)
 add_subdirectory(asnyc_ads)
+add_subdirectory(ads_protocol_client)
