@@ -11,9 +11,14 @@ int main(){
     client->setChannel(grpc::CreateChannel("192.168.56.101:18000",
                                            grpc::InsecureChannelCredentials()));
 
+    client->onStreamEstablished();
+
+
+
     client->AggregatedDiscoveryService();
     //grpc::CreateInsecureChannelFromFd();
 
+    client->shutdown();
 
     return 0;
 }
