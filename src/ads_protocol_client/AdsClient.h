@@ -106,8 +106,6 @@ public:
             std::cout << "type-url : " << discoveryResponse.type_url() << std::endl;
 
 
-
-
             std::cout << "Resources : "  << std::endl;
             for (const auto& resource : discoveryResponse.resources()) {
                 envoy::config::cluster::v3::Cluster r;
@@ -121,8 +119,6 @@ public:
 
         return isOk;
     }
-
-
 
 
     void unpackToOrThrow(const google::protobuf::Any& any_message, google::protobuf::Message& message) {
