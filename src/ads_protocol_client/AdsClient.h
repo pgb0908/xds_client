@@ -10,7 +10,7 @@
 #include <queue>
 #include "memory"
 #include "../../schema/proto-src/xds.grpc.pb.h"
-#include "envoy/admin/v2alpha/clusters.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -110,13 +110,9 @@ public:
 
             std::cout << "Resources : "  << std::endl;
             for (const auto& resource : discoveryResponse.resources()) {
-                std::cout << "  Resource Type URL: " << resource.type_url() << std::endl;
-                std::cout << "  Resource Type value: " << resource.value().c_str() << std::endl;
                 envoy::config::cluster::v3::Cluster r;
-                //printAnyTypeInfo(resource);
                 unpackToOrThrow(resource, r);
                 std::cout << "  r : " << r.DebugString() << std::endl;
-                std::cout << "  r.name() : " << r.name() << std::endl;
 
 
             }

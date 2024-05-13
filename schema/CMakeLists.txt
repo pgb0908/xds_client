@@ -72,6 +72,9 @@ add_custom_command(
 grpc_generate_cpp(grpc_srcs grpc_hdrs ${PROTO_SRC_DIR} ${proto})]]
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/proto-src/proto)
+
+
+
 add_library(target STATIC
         ../src/ads/AdsClient.cpp
         ../src/asnyc_ads/AsyncAdsClient.cpp
@@ -79,5 +82,10 @@ add_library(target STATIC
         ${grpc_srcs}
         ${ENVOY_PROTO_SRCS}
 )
+
+TARGET_INCLUDE_DIRECTORIES(target PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/proto-src/proto
+)
+
 
 target_link_libraries(target PRIVATE ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
