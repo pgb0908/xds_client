@@ -3,18 +3,20 @@
 //
 
 #include "AdsClient.h"
+#include "OpaqueResourceDecoder.h"
+#include "DecodedResource.h"
 
 void AdsClient::onStreamEstablished() {
     stream_ = stub_->StreamAggregatedResources(&context_);
 
-    if(stream_){
+    if (stream_) {
         first_stream_request_ = true;
         clearNonce();
         request_queue_ = std::make_unique<std::queue<std::string>>();
-        for (const auto& type_url : subscriptions_) {
-           // queueDiscoveryRequest(type_url);
+        for (const auto &type_url: subscriptions_) {
+            queueDiscoveryRequest(type_url);
         }
-    }else{
+    } else {
         std::cout << "can't make stream. something wrong!" << std::endl;
     }
 }
@@ -22,7 +24,7 @@ void AdsClient::onStreamEstablished() {
 void AdsClient::endStream() {
     stream_->WritesDone();
     Status status = stream_->Finish();
-    if(!status.ok()){
+    if (!status.ok()) {
         std::cout << "rpc failed" << std::endl;
     }
     std::cout << "end stream" << std::endl;
@@ -34,8 +36,8 @@ AdsClient::ApiState &AdsClient::apiStateFor(std::string type_url) {
     if (itr == api_state_.end()) {
         api_state_.emplace(
                 type_url,
-                std::make_unique<ApiState>([this, type_url](const auto& expired) {
-                   expiryCallback(type_url, expired);
+                std::make_unique<ApiState>([this, type_url](const auto &expired) {
+                    expiryCallback(type_url, expired);
                 }));
     }
 
@@ -69,7 +71,7 @@ void AdsClient::expiryCallback(std::string type_url, const std::vector<std::stri
 
 void AdsClient::clearNonce() {
     // Iterate over all api_states (for each type_url), and clear its nonce.
-    for (auto& [type_url, api_state] : api_state_) {
+    for (auto &[type_url, api_state]: api_state_) {
         if (api_state) {
             api_state->request_.clear_response_nonce();
         }
@@ -77,16 +79,16 @@ void AdsClient::clearNonce() {
 }
 
 
-
-void AdsClient::queueDiscoveryRequest(std::string queue_item) {
-    if(stream_ == nullptr){
+void AdsClient::queueDiscoveryRequest(const std::string &queue_item) {
+    if (stream_ == nullptr) {
         std::cout << "No stream available to queueDiscoveryRequest for " << queue_item << std::endl;
         return; // Drop this request; the reconnect will enqueue a new one.
     }
 
-    ApiState& api_state = apiStateFor(queue_item);
+    ApiState &api_state = apiStateFor(queue_item);
     if (api_state.paused()) {
         //ENVOY_LOG(trace, "API {} paused during queueDiscoveryRequest(), setting pending.", queue_item);
+        std::cout << "API " << queue_item << " paused during queueDiscoveryRequest(), setting pending." << std::endl;
         api_state.pending_ = true;
         return; // Drop this request; the unpause will enqueue a new one.
     }
@@ -107,21 +109,20 @@ void AdsClient::sendDiscoveryRequest(std::string type_url) {
         return;
     }
 
-    ApiState& api_state = apiStateFor(type_url);
-    auto& request = api_state.request_;
+    ApiState &api_state = apiStateFor(type_url);
+    auto &request = api_state.request_;
     request.mutable_resource_names()->Clear();
 
     // Maintain a set to avoid dupes.
-/*    std::set<std::string> resources;
-    for (const auto* watch : api_state.watches_) {
-        for (const std::string& resource : watch->resources_) {
-            if (!resources.contains(resource)) {
+    std::set<std::string> resources;
+    for (const auto *watch: api_state.watches_) {
+        for (const std::string &resource: watch->resources_) {
+            if (resources.find(resource) == resources.end()) {
                 resources.emplace(resource);
                 request.add_resource_names(resource);
             }
         }
-    }*/
-
+    }
 
     if (api_state.must_send_node_ || first_stream_request_) {
         // Node may have been cleared during a previous request.
@@ -138,7 +139,7 @@ void AdsClient::sendDiscoveryRequest(std::string type_url) {
         request.clear_node();
     }
 
-    std::cout << "Sending DiscoveryRequest for : " << type_url << ": "  <<  request.ShortDebugString() << std::endl;
+    std::cout << "Sending DiscoveryRequest for : " << type_url << ": " << request.ShortDebugString() << std::endl;
     stream_->Write(request);
     first_stream_request_ = false;
 
@@ -146,23 +147,31 @@ void AdsClient::sendDiscoveryRequest(std::string type_url) {
     if (apiStateFor(type_url).request_.has_error_detail()) {
         apiStateFor(type_url).request_.clear_error_detail();
     }
+
+
+    DiscoveryResponse discoveryResponse;
+    while (stream_->Read(&discoveryResponse)) {
+        onDiscoveryResponse(discoveryResponse);
+    }
+
 }
 
-void AdsClient::onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> &&message) {
-/*    const std::string type_url = message->type_url();
-    std::cout << "Received gRPC message for " << type_url << " at version " << message->version_info() << std::endl;
+void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::DiscoveryResponse &message) {
+    const std::string type_url = message.type_url();
+    std::cout << "Received gRPC message for " << type_url << " at version " << message.version_info() << std::endl;
 
     if (api_state_.count(type_url) == 0) {
         // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
         // protocol violation
 
-        std::cout << "Ignoring the message for type URL " << type_url << "as it has no current subscribers."<< std::endl;
+        std::cout << "Ignoring the message for type URL " << type_url << "as it has no current subscribers."
+                  << std::endl;
         return;
     }
 
-    ApiState& api_state = apiStateFor(type_url);
+    ApiState &api_state = apiStateFor(type_url);
 
-*//*    if (message->has_control_plane()) {
+/*    if (message->has_control_plane()) {
         control_plane_stats.identifier_.set(message->control_plane().identifier());
 
         if (message->control_plane().identifier() != api_state.control_plane_identifier_) {
@@ -170,68 +179,68 @@ void AdsClient::onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v
             ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", type_url,
                       api_state.control_plane_identifier_);
         }
-    }*//*
+    }*/
 
-*//*    if (api_state.watches_.empty()) {
+    if (api_state.watches_.empty()) {
         // update the nonce as we are processing this response.
-        api_state.request_.set_response_nonce(message->nonce());
-        if (message->resources().empty()) {
+        api_state.request_.set_response_nonce(message.nonce());
+        if (message.resources().empty()) {
             // No watches and no resources. This can happen when envoy unregisters from a
             // resource that's removed from the server as well. For example, a deleted cluster
             // triggers un-watching the ClusterLoadAssignment watch, and at the same time the
             // xDS server sends an empty list of ClusterLoadAssignment resources. we'll accept
             // this update. no need to send a discovery request, as we don't watch for anything.
-            api_state.request_.set_version_info(message->version_info());
+            api_state.request_.set_version_info(message.version_info());
         } else {
             // No watches and we have resources - this should not happen. send a NACK (by not
             // updating the version).
-            ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
+            //ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
+            std::cout << "Ignoring unwatched type URL " << type_url<< std::endl;
             queueDiscoveryRequest(type_url);
         }
         return;
-    }*//*
-    //ScopedResume same_type_resume;
+    }
+    ScopedResume same_type_resume;
     // We pause updates of the same type. This is necessary for SotW and GrpcMuxImpl, since unlike
     // delta and NewGRpcMuxImpl, independent watch additions/removals trigger updates regardless of
     // the delta state. The proper fix for this is to converge these implementations,
     // see https://github.com/envoyproxy/envoy/issues/11477.
-   // same_type_resume = pause(type_url);
+    same_type_resume = pause(type_url);
 
-        std::vector<DecodedResourcePtr> resources;
-        OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
+    std::vector<DecodedResourcePtr> resources;
+    OpaqueResourceDecoder &resource_decoder = *api_state.watches_.front()->resource_decoder_;
 
-        for (const auto& resource : message->resources()) {
-            // TODO(snowp): Check the underlying type when the resource is a Resource.
-            if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
-                type_url != resource.type_url()) {
-                throw EnvoyException(
-                        fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
-                                    resource.type_url(), type_url, message->DebugString()));
-            }
-
-            auto decoded_resource =
-                    DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info());
-
-            if (!isHeartbeatResource(type_url, *decoded_resource)) {
-                resources.emplace_back(std::move(decoded_resource));
-            }
+    for (const auto &resource: message.resources()) {
+        // TODO(snowp): Check the underlying type when the resource is a Resource.
+        if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
+            type_url != resource.type_url()) {
+            throw EnvoyException(
+                    fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
+                                resource.type_url(), type_url, message->DebugString()));
         }
 
-        processDiscoveryResources(resources, api_state, type_url, message->version_info(),
-        *//*call_delegate=*//*true);
+        auto decoded_resource = fromResource(resource_decoder, resource, message->version_info());
 
-        // Processing point when resources are successfully ingested.
-        if (xds_config_tracker_.has_value()) {
-            xds_config_tracker_->onConfigAccepted(type_url, resources);
+        if (!isHeartbeatResource(type_url, *decoded_resource)) {
+            resources.emplace_back(std::move(decoded_resource));
         }
+    }
+
+    processDiscoveryResources(resources, api_state, type_url, message->version_info(),
+                              call_delegate = true);
+
+    // Processing point when resources are successfully ingested.
+    if (xds_config_tracker_.has_value()) {
+        xds_config_tracker_->onConfigAccepted(type_url, resources);
+    }
 
 
-    catch (const EnvoyException& e) {
-        for (auto watch : api_state.watches_) {
+    catch (const EnvoyException &e) {
+        for (auto watch: api_state.watches_) {
             watch->callbacks_.onConfigUpdateFailed(
                     Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
         }
-        ::google::rpc::Status* error_detail = api_state.request_.mutable_error_detail();
+        ::google::rpc::Status *error_detail = api_state.request_.mutable_error_detail();
         error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
         error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
 
@@ -241,8 +250,8 @@ void AdsClient::onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v
         }
     }
     api_state.previously_fetched_data_ = true;
-    api_state.request_.set_response_nonce(message->nonce());
+    api_state.request_.set_response_nonce(message.nonce());
     //ASSERT(api_state.paused());
-    queueDiscoveryRequest(type_url);*/
+    queueDiscoveryRequest(type_url);
 }
 

@@ -11,6 +11,8 @@
 #include "memory"
 #include "../../schema/proto-src/xds.grpc.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "ResourceName.h"
+#include "Watcher.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -27,7 +29,6 @@ class AdsClient {
 public:
     // Constructor
     AdsClient(){
-
         subscriptions_.push_back("type.googleapis.com/envoy.config.cluster.v3.Cluster");
     }
     AdsClient(const std::shared_ptr<Channel>& channel)
@@ -47,7 +48,7 @@ public:
         shutdown_ = true;
     }
 
-    void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
+    void onDiscoveryResponse(const envoy::service::discovery::v3::DiscoveryResponse& message);
 
     void continueChat(){
         std::cout << "================ request =======================" << std::endl;
@@ -120,31 +121,13 @@ public:
         return isOk;
     }
 
-
     void unpackToOrThrow(const google::protobuf::Any& any_message, google::protobuf::Message& message) {
         if (!message.ParseFromString(any_message.value())) {
             //throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
             std::cout << "failed to parsed" << std::endl;
         }
     }
-
-private:
-    void queueDiscoveryRequest(std::string queue_item);
-    void drainRequests();
-    void sendDiscoveryRequest(std::string type_url);
-    void endStream();
-
-    std::unique_ptr<AggregatedDiscoveryService::Stub> stub_;
-    ClientContext context_;
-    bool first_{true};
-    bool isOk{false};
-    std::string version_info_;
-    std::string nonce_;
-    DiscoveryRequest discoveryRequest_;
-    //ClientContext context_;
-    std::shared_ptr<grpc::ClientReaderWriter<DiscoveryRequest, DiscoveryResponse>> stream_;
-
-    void clearNonce();
+    void queueDiscoveryRequest(const std::string& queue_item);
 
     // Per muxed API state.
     struct ApiState {
@@ -153,7 +136,7 @@ private:
         bool paused() const { return pauses_ > 0; }
 
         // Watches on the returned resources for the API;
-        //std::list<GrpcMuxWatchImpl*> watches_;
+        std::list<Watcher*> watches_;
 
         // Current DiscoveryRequest for API.
         envoy::service::discovery::v3::DiscoveryRequest request_;
@@ -172,11 +155,34 @@ private:
         bool previously_fetched_data_{false};
     };
 
+    // Helper function for looking up and potentially allocating a new ApiState.
+    ApiState& apiStateFor(std::string type_url);
+
+private:
+
+    void drainRequests();
+    void sendDiscoveryRequest(std::string type_url);
+    void endStream();
+
+    void processDiscoveryResources(const std::vector<DecodedResourcePtr>& resources,
+                                   ApiState& api_state, const std::string& type_url,
+                                   const std::string& version_info, bool call_delegate);
+
+    std::unique_ptr<AggregatedDiscoveryService::Stub> stub_;
+    ClientContext context_;
+    bool first_{true};
+    bool isOk{false};
+    std::string version_info_;
+    std::string nonce_;
+    DiscoveryRequest discoveryRequest_;
+    //ClientContext context_;
+    std::shared_ptr<grpc::ClientReaderWriter<DiscoveryRequest, DiscoveryResponse>> stream_;
+
+    void clearNonce();
+
     // Envoy's dependency ordering.
     std::list<std::string> subscriptions_;
 
-    // Helper function for looking up and potentially allocating a new ApiState.
-    ApiState& apiStateFor(std::string type_url);
 
     std::unordered_map<std::string, std::unique_ptr<ApiState>> api_state_;
 
