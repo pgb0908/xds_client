@@ -5,12 +5,11 @@
 #ifndef XDS_CLIENT_OPAQUERESOURCEDECODER_H
 #define XDS_CLIENT_OPAQUERESOURCEDECODER_H
 
+#include <utility>
+
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "protofile/text_format_transcoder.h"
-#include "envoy/protobuf.h"
-
 namespace {
-
     static void unpackToOrThrow(const google::protobuf::Any& any_message, google::protobuf::Message& message) {
         if (!message.ParseFromString(any_message.value())) {
             //throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
@@ -53,12 +52,7 @@ namespace {
      */
     static inline std::string getStringField(const google::protobuf::Message& message,
                                              const std::string& field_name) {
-        auto reflectable_message = Envoy::createReflectableMessage(message);
-        const google::protobuf::Descriptor* descriptor = reflectable_message->GetDescriptor();
-        const google::protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
-        const google::protobuf::Reflection* reflection = reflectable_message->GetReflection();
-        return reflection->GetString(*reflectable_message, name_field);
-        return name_field->name();
+        return "";
     }
 
 }
@@ -89,7 +83,7 @@ template <typename Current>
 class OpaqueResourceDecoderImpl{
 public:
     OpaqueResourceDecoderImpl(std::string name_field)
-            :  name_field_(name_field) {}
+            :  name_field_(std::move(name_field)) {}
 
     // Config::OpaqueResourceDecoder
     std::unique_ptr<google::protobuf::Message> decodeResource(const google::protobuf::Any& resource)  {

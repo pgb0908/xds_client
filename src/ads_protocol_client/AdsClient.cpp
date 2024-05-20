@@ -5,6 +5,7 @@
 #include "AdsClient.h"
 #include "OpaqueResourceDecoder.h"
 #include "DecodedResource.h"
+#include "Watcher.h"
 
 void AdsClient::onStreamEstablished() {
     stream_ = stub_->StreamAggregatedResources(&context_);
@@ -200,7 +201,7 @@ void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::Discove
         }
         return;
     }
-    ScopedResume same_type_resume;
+/*    ScopedResume same_type_resume;
     // We pause updates of the same type. This is necessary for SotW and GrpcMuxImpl, since unlike
     // delta and NewGRpcMuxImpl, independent watch additions/removals trigger updates regardless of
     // the delta state. The proper fix for this is to converge these implementations,
@@ -214,8 +215,7 @@ void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::Discove
         // TODO(snowp): Check the underlying type when the resource is a Resource.
         if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
             type_url != resource.type_url()) {
-            throw EnvoyException(
-                    fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
+            throw EnvoyException(fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
                                 resource.type_url(), type_url, message->DebugString()));
         }
 
@@ -224,18 +224,20 @@ void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::Discove
         if (!isHeartbeatResource(type_url, *decoded_resource)) {
             resources.emplace_back(std::move(decoded_resource));
         }
-    }
+    }*/
 
-    processDiscoveryResources(resources, api_state, type_url, message->version_info(),
-                              call_delegate = true);
+/*    processDiscoveryResources(resources, api_state, type_url, message->version_info(),
+                              call_delegate = true);*/
 
+/*
     // Processing point when resources are successfully ingested.
     if (xds_config_tracker_.has_value()) {
         xds_config_tracker_->onConfigAccepted(type_url, resources);
     }
+*/
 
 
-    catch (const EnvoyException &e) {
+/*    catch (const EnvoyException &e) {
         for (auto watch: api_state.watches_) {
             watch->callbacks_.onConfigUpdateFailed(
                     Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
@@ -248,10 +250,48 @@ void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::Discove
         if (xds_config_tracker_.has_value()) {
             xds_config_tracker_->onConfigRejected(*message, error_detail->message());
         }
-    }
+    }*/
     api_state.previously_fetched_data_ = true;
     api_state.request_.set_response_nonce(message.nonce());
     //ASSERT(api_state.paused());
     queueDiscoveryRequest(type_url);
+}
+
+void
+AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &resources, AdsClient::ApiState &api_state,
+                                     const std::string &type_url, const std::string &version_info, bool call_delegate) {
+
+}
+
+std::unique_ptr<Watcher> AdsClient::addWatch(const std::string &type_url, const std::set<std::string> &resources,
+                                             OpaqueResourceDecoderSharedPtr resource_decoder) {
+    // Resource cache is only used for EDS resources.
+/*    EdsResourcesCacheOptRef resources_cache{absl::nullopt};
+    if (eds_resources_cache_ &&
+        (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
+        resources_cache = makeOptRefFromPtr(eds_resources_cache_.get());
+    }*/
+    auto watch = std::make_unique<Watcher>(resources, resource_decoder, type_url,
+                                                    *this);
+    std::cout << "gRPC mux addWatch for " << type_url;
+
+    // Lazily kick off the requests based on first subscription. This has the
+    // convenient side-effect that we order messages on the channel based on
+    // Envoy's internal dependency ordering.
+    // TODO(gsagula): move TokenBucketImpl params to a config.
+    if (!apiStateFor(type_url).subscribed_) {
+        apiStateFor(type_url).request_.set_type_url(type_url);
+        //apiStateFor(type_url).request_.mutable_node()->MergeFrom(local_info_.node());
+        apiStateFor(type_url).subscribed_ = true;
+        subscriptions_.emplace_back(type_url);
+    }
+
+    // This will send an updated request on each subscription.
+    // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
+    // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
+    // only send a single RDS/EDS update after the CDS/LDS update.
+    queueDiscoveryRequest(type_url);
+
+    return watch;
 }
 

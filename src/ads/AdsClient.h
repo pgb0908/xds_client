@@ -8,7 +8,7 @@
 #include <grpc++/grpc++.h>
 #include <thread>
 #include "memory"
-#include "../../schema/proto-src/xds.grpc.pb.h"
+#include "envoy/service/discovery/v3/ads.grpc.pb.h"
 
 
 using grpc::Channel;

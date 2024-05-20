@@ -7,9 +7,7 @@
 
 #include <memory>
 //#include "envoy/service/discovery/v3/discovery.pb.h"
-#include "../../schema/proto-src/xds.grpc.pb.h"
 #include "xds/core/v3/collection_entry.pb.h"
-
 #include "OpaqueResourceDecoder.h"
 
 namespace {

@@ -9,12 +9,11 @@
 #include <grpc++/grpc++.h>
 #include <thread>
 #include "memory"
-#include "../../schema/proto-src/xds.grpc.pb.h"
 
 using envoy::service::discovery::v3::AggregatedDiscoveryService;
 using envoy::service::discovery::v3::DiscoveryRequest;
 using envoy::service::discovery::v3::DiscoveryResponse;
-using envoy::service::discovery::v3::Node;
+using envoy::config::core::v3::Node;
 
 class RejectedConfig{
 public:

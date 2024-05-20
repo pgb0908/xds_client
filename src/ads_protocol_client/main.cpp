@@ -15,7 +15,7 @@ int main(){
 
 
 
-    client->AggregatedDiscoveryService();
+    //client->AggregatedDiscoveryService();
     //grpc::CreateInsecureChannelFromFd();
 
     client->shutdown();

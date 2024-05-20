@@ -9,10 +9,10 @@
 #include <thread>
 #include <queue>
 #include "memory"
-#include "../../schema/proto-src/xds.grpc.pb.h"
-#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "ResourceName.h"
-#include "Watcher.h"
+#include "DecodedResource.h"
+#include "envoy/service/discovery/v3/ads.grpc.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -22,8 +22,10 @@ using grpc::ServerContext;
 using envoy::service::discovery::v3::AggregatedDiscoveryService;
 using envoy::service::discovery::v3::DiscoveryRequest;
 using envoy::service::discovery::v3::DiscoveryResponse;
-using envoy::service::discovery::v3::Node;
+using envoy::config::core::v3::Node;
 
+
+class Watcher;
 
 class AdsClient {
 public:
@@ -42,6 +44,10 @@ public:
     }
 
     void onStreamEstablished();
+
+    std::unique_ptr<Watcher> addWatch(const std::string& type_url,
+                             const std::set<std::string>& resources,
+                             OpaqueResourceDecoderSharedPtr resource_decoder);
 
     void shutdown() {
         endStream();

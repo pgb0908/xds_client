@@ -13,10 +13,9 @@
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
 
-#include "../../schema/proto-src/xds.grpc.pb.h"
-
 #include <thread>
 #include "memory"
+#include "envoy/service/discovery/v3/ads.grpc.pb.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
