@@ -31,11 +31,11 @@ class AdsClient {
 public:
     // Constructor
     AdsClient(){
-        subscriptions_.push_back("type.googleapis.com/envoy.config.cluster.v3.Cluster");
+        //subscriptions_.push_back("type.googleapis.com/envoy.config.cluster.v3.Cluster");
     }
     AdsClient(const std::shared_ptr<Channel>& channel)
         : stub_(AggregatedDiscoveryService::NewStub(channel)) {
-        subscriptions_.push_back("type.googleapis.com/envoy.config.cluster.v3.Cluster");
+        //subscriptions_.push_back("type.googleapis.com/envoy.config.cluster.v3.Cluster");
     }
 
     void setChannel(const std::shared_ptr<Channel>& channel){
@@ -46,8 +46,8 @@ public:
     void onStreamEstablished();
 
     std::unique_ptr<Watcher> addWatch(const std::string& type_url,
-                             const std::set<std::string>& resources,
-                             OpaqueResourceDecoderSharedPtr resource_decoder);
+                                      const std::set<std::string>& resources,
+                                      const OpaqueResourceDecoderSharedPtr& resource_decoder);
 
     void shutdown() {
         endStream();
@@ -173,6 +173,13 @@ private:
     void processDiscoveryResources(const std::vector<DecodedResourcePtr>& resources,
                                    ApiState& api_state, const std::string& type_url,
                                    const std::string& version_info, bool call_delegate);
+
+    static std::string truncateGrpcStatusMessage(std::string error_message);
+
+    bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
+        return !resource.hasResource() &&
+               resource.version() == apiStateFor(type_url).request_.version_info();
+    }
 
     std::unique_ptr<AggregatedDiscoveryService::Stub> stub_;
     ClientContext context_;

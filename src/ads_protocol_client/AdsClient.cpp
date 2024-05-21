@@ -2,14 +2,17 @@
 // Created by bont on 24. 5. 8.
 //
 
+#include <sstream>
 #include "AdsClient.h"
 #include "OpaqueResourceDecoder.h"
 #include "DecodedResource.h"
 #include "Watcher.h"
+#include "Status.h"
 
 void AdsClient::onStreamEstablished() {
     stream_ = stub_->StreamAggregatedResources(&context_);
 
+    std::cout << "hello" << std::endl;
     if (stream_) {
         first_stream_request_ = true;
         clearNonce();
@@ -106,6 +109,7 @@ void AdsClient::drainRequests() {
 }
 
 void AdsClient::sendDiscoveryRequest(std::string type_url) {
+    std::cout << "sendling Discovery-Request" << std::endl;
     if (shutdown_) {
         return;
     }
@@ -117,10 +121,12 @@ void AdsClient::sendDiscoveryRequest(std::string type_url) {
     // Maintain a set to avoid dupes.
     std::set<std::string> resources;
     for (const auto *watch: api_state.watches_) {
-        for (const std::string &resource: watch->resources_) {
-            if (resources.find(resource) == resources.end()) {
-                resources.emplace(resource);
-                request.add_resource_names(resource);
+        if(!watch->resources_.empty()){
+            for (const std::string &resource: watch->resources_) {
+                if (resources.find(resource) == resources.end()) {
+                    resources.emplace(resource);
+                    request.add_resource_names(resource);
+                }
             }
         }
     }
@@ -158,7 +164,7 @@ void AdsClient::sendDiscoveryRequest(std::string type_url) {
 }
 
 void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::DiscoveryResponse &message) {
-    const std::string type_url = message.type_url();
+    const std::string& type_url = message.type_url();
     std::cout << "Received gRPC message for " << type_url << " at version " << message.version_info() << std::endl;
 
     if (api_state_.count(type_url) == 0) {
@@ -201,33 +207,43 @@ void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::Discove
         }
         return;
     }
-/*    ScopedResume same_type_resume;
+    //ScopedResume same_type_resume;
     // We pause updates of the same type. This is necessary for SotW and GrpcMuxImpl, since unlike
     // delta and NewGRpcMuxImpl, independent watch additions/removals trigger updates regardless of
     // the delta state. The proper fix for this is to converge these implementations,
     // see https://github.com/envoyproxy/envoy/issues/11477.
-    same_type_resume = pause(type_url);
+    //same_type_resume = pause(type_url);
 
-    std::vector<DecodedResourcePtr> resources;
-    OpaqueResourceDecoder &resource_decoder = *api_state.watches_.front()->resource_decoder_;
+    try{
+        std::vector<DecodedResourcePtr> resources;
+        OpaqueResourceDecoder &resource_decoder = *api_state.watches_.front()->resource_decoder_;
 
-    for (const auto &resource: message.resources()) {
-        // TODO(snowp): Check the underlying type when the resource is a Resource.
-        if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
-            type_url != resource.type_url()) {
-            throw EnvoyException(fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
-                                resource.type_url(), type_url, message->DebugString()));
+        for (const auto &resource: message.resources()) {
+            // TODO(snowp): Check the underlying type when the resource is a Resource.
+            if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
+                type_url != resource.type_url()) {
+
+                std::stringstream ss;
+                ss << resource.type_url() << " does not match the message-wide type URL "<< type_url << " in DiscoveryResponse "
+                          <<message.DebugString();
+
+                throw std::runtime_error(ss.str());
+            }
+
+            auto decoded_resource = DecodedResource::fromResource(
+                    resource_decoder, resource, message.version_info());
+            //auto decoded_resource = fromResource(resource_decoder, resource, message->version_info());
+
+            std::cout << "resource debug : " << decoded_resource->resource().DebugString() << std::endl;
+
+            if (!isHeartbeatResource(type_url, *decoded_resource)) {
+                resources.emplace_back(std::move(decoded_resource));
+            }
+
         }
 
-        auto decoded_resource = fromResource(resource_decoder, resource, message->version_info());
-
-        if (!isHeartbeatResource(type_url, *decoded_resource)) {
-            resources.emplace_back(std::move(decoded_resource));
-        }
-    }*/
-
-/*    processDiscoveryResources(resources, api_state, type_url, message->version_info(),
-                              call_delegate = true);*/
+        processDiscoveryResources(resources, api_state, type_url, message.version_info(),
+                                  true);
 
 /*
     // Processing point when resources are successfully ingested.
@@ -235,22 +251,21 @@ void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::Discove
         xds_config_tracker_->onConfigAccepted(type_url, resources);
     }
 */
-
-
-/*    catch (const EnvoyException &e) {
-        for (auto watch: api_state.watches_) {
+    }catch (std::exception& e){
+/*        for (auto watch: api_state.watches_) {
             watch->callbacks_.onConfigUpdateFailed(
                     Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
-        }
+        }*/
         ::google::rpc::Status *error_detail = api_state.request_.mutable_error_detail();
         error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
-        error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
+        error_detail->set_message(truncateGrpcStatusMessage(e.what()));
 
         // Processing point when there is any exception during the parse and ingestion process.
-        if (xds_config_tracker_.has_value()) {
+/*        if (xds_config_tracker_.has_value()) {
             xds_config_tracker_->onConfigRejected(*message, error_detail->message());
-        }
-    }*/
+        }*/
+    }
+
     api_state.previously_fetched_data_ = true;
     api_state.request_.set_response_nonce(message.nonce());
     //ASSERT(api_state.paused());
@@ -264,7 +279,7 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
 }
 
 std::unique_ptr<Watcher> AdsClient::addWatch(const std::string &type_url, const std::set<std::string> &resources,
-                                             OpaqueResourceDecoderSharedPtr resource_decoder) {
+                                             const OpaqueResourceDecoderSharedPtr& resource_decoder) {
     // Resource cache is only used for EDS resources.
 /*    EdsResourcesCacheOptRef resources_cache{absl::nullopt};
     if (eds_resources_cache_ &&
@@ -273,7 +288,8 @@ std::unique_ptr<Watcher> AdsClient::addWatch(const std::string &type_url, const 
     }*/
     auto watch = std::make_unique<Watcher>(resources, resource_decoder, type_url,
                                                     *this);
-    std::cout << "gRPC mux addWatch for " << type_url;
+
+    std::cout << "gRPC mux addWatch for " << type_url << std::endl;
 
     // Lazily kick off the requests based on first subscription. This has the
     // convenient side-effect that we order messages on the channel based on
@@ -281,7 +297,7 @@ std::unique_ptr<Watcher> AdsClient::addWatch(const std::string &type_url, const 
     // TODO(gsagula): move TokenBucketImpl params to a config.
     if (!apiStateFor(type_url).subscribed_) {
         apiStateFor(type_url).request_.set_type_url(type_url);
-        //apiStateFor(type_url).request_.mutable_node()->MergeFrom(local_info_.node());
+        apiStateFor(type_url).request_.mutable_node()->MergeFrom(node());
         apiStateFor(type_url).subscribed_ = true;
         subscriptions_.emplace_back(type_url);
     }
@@ -293,5 +309,17 @@ std::unique_ptr<Watcher> AdsClient::addWatch(const std::string &type_url, const 
     queueDiscoveryRequest(type_url);
 
     return watch;
+
+}
+
+std::string AdsClient::truncateGrpcStatusMessage(std::string error_message) {
+    // GRPC sends error message via trailers, which by default has a 8KB size limit(see
+    // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests). Truncates the
+    // error message if it's too long.
+    constexpr uint32_t kProtobufErrMsgLen = 4096;
+    std::stringstream ss;
+    ss << error_message.substr(0, kProtobufErrMsgLen) ;
+    ss << (error_message.length() > kProtobufErrMsgLen ? "...(truncated)" : "");
+    return ss.str();
 }
 

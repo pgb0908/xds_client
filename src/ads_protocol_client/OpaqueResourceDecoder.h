@@ -80,13 +80,13 @@ using OpaqueResourceDecoderSharedPtr = std::shared_ptr<OpaqueResourceDecoder>;
 
 
 template <typename Current>
-class OpaqueResourceDecoderImpl{
+class OpaqueResourceDecoderImpl : public OpaqueResourceDecoder {
 public:
     OpaqueResourceDecoderImpl(std::string name_field)
             :  name_field_(std::move(name_field)) {}
 
     // Config::OpaqueResourceDecoder
-    std::unique_ptr<google::protobuf::Message> decodeResource(const google::protobuf::Any& resource)  {
+    std::unique_ptr<google::protobuf::Message> decodeResource(const google::protobuf::Any& resource)  override {
         auto typed_message = std::make_unique<Current>();
         // If the Any is a synthetic empty message (e.g. because the resource field was not set in
         // Resource, this might be empty, so we shouldn't decode.
@@ -96,9 +96,10 @@ public:
         return typed_message;
     }
 
-    std::string resourceName(const google::protobuf::Message& resource) {
+    std::string resourceName(const google::protobuf::Message& resource) override {
         return getStringField(resource, name_field_);
     }
+
 
 private:
    // ProtobufMessage::ValidationVisitor& validation_visitor_;
