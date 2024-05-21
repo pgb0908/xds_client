@@ -304,7 +304,11 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
         }*/
 
         all_resource_refs.emplace_back(*resource);
-        if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
+
+        std::cout << "resource->name() : " << resource->name() << std::endl;
+
+
+/*        if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
             // Sort the context params of an xdstp resource, so we can compare them easily.
             auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource->name());
             THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
@@ -315,23 +319,23 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
                                      *resource);
         } else {
             resource_ref_map.emplace(resource->name(), *resource);
-        }
+        }*/
     }
 
     // Execute external config validators if there are any watches.
-    if (!api_state.watches_.empty()) {
+/*    if (!api_state.watches_.empty()) {
         config_validators_->executeValidators(type_url, resources);
-    }
+    }*/
 
     for (auto watch : api_state.watches_) {
         // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
         // Listener) even if the message does not have resources so that update_empty stat
         // is properly incremented and state-of-the-world semantics are maintained.
-        if (watch->resources_.empty()) {
+/*        if (watch->resources_.empty()) {
             THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(all_resource_refs, version_info));
             continue;
-        }
-        std::vector<DecodedResourceRef> found_resources;
+        }*/
+/*        std::vector<std::reference_wrapper<DecodedResource>>> found_resources;
         for (const auto& watched_resource_name : watch->resources_) {
             // Look for a singleton subscription.
             auto it = resource_ref_map.find(watched_resource_name);
@@ -350,11 +354,11 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
                     }
                 }
             }
-        }
+        }*/
 
         // onConfigUpdate should be called only on watches(clusters/listeners) that have
         // updates in the message for EDS/RDS.
-        if (!found_resources.empty()) {
+/*        if (!found_resources.empty()) {
             THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(found_resources, version_info));
             // Resource cache is only used for EDS resources.
             if (eds_resources_cache_ &&
@@ -369,20 +373,17 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
                 // subscriptions are supported, and these resources are removed in the call
                 // to updateWatchInterest().
             }
-        }
+        }*/
     }
 
     // All config updates have been applied without throwing an exception, so we'll call the xDS
     // resources delegate, if any.
-    if (call_delegate && xds_resources_delegate_.has_value()) {
+/*    if (call_delegate && xds_resources_delegate_.has_value()) {
         xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId{target_xds_authority_, type_url},
                                                  all_resource_refs);
-    }
+    }*/
 
-    // TODO(mattklein123): In the future if we start tracking per-resource versions, we
-    // would do that tracking here.
     api_state.request_.set_version_info(version_info);
-    Memory::Utils::tryShrinkHeap();
 }
 
 std::unique_ptr<Watcher> AdsClient::addWatch(const std::string &type_url, const std::set<std::string> &resources,

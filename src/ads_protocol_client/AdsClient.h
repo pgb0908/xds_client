@@ -13,6 +13,7 @@
 #include "DecodedResource.h"
 #include "envoy/service/discovery/v3/ads.grpc.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "Cleanup.h"
 
 using grpc::Channel;
@@ -33,11 +34,9 @@ class AdsClient {
 public:
     // Constructor
     AdsClient(){
-        //subscriptions_.push_back("type.googleapis.com/envoy.config.cluster.v3.Cluster");
     }
     AdsClient(const std::shared_ptr<Channel>& channel)
         : stub_(AggregatedDiscoveryService::NewStub(channel)) {
-        //subscriptions_.push_back("type.googleapis.com/envoy.config.cluster.v3.Cluster");
     }
 
     void setChannel(const std::shared_ptr<Channel>& channel){
@@ -120,8 +119,6 @@ public:
                 envoy::config::cluster::v3::Cluster r;
                 unpackToOrThrow(resource, r);
                 std::cout << "  r : " << r.DebugString() << std::endl;
-
-
             }
             continueChat();
         }
