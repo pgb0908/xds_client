@@ -1,7 +1,9 @@
 
 # gRPC
 # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
-set(_PROTOBUF_PROTOC ${CONAN_BIN_DIRS_PROTOBUF}/protoc)
+set(_PROTOBUF_PROTOC ${Protobuf_PROTOC_EXECUTABLE})
+set(PROTOC_FLAGS "--experimental_allow_proto3_optional")
+
 message(STATUS "_PROTOBUF_PROTOC ${_PROTOBUF_PROTOC}")
 find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin)
 
@@ -122,7 +124,12 @@ add_library(target STATIC
 
 TARGET_INCLUDE_DIRECTORIES(target PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/proto-src/proto
+        ${protobuf_INCLUDE_DIRS} ${gRPC_INCLUDE_DIRS}
+        ${absl_INCLUDE_DIRS}
 )
 
 
-target_link_libraries(target PRIVATE ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
+target_link_libraries(target PRIVATE
+        ${protobuf_LIBRARIES} ${gRPC_LIBRARIES}
+        ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF}
+        absl::synchronization)

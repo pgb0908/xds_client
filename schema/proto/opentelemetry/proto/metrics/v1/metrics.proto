@@ -357,7 +357,7 @@ message NumberDataPoint {
   // attribute with the same key).
   repeated opentelemetry.proto.common.v1.KeyValue attributes = 7;
 
-  // StartTimeUnixNano is optional but strongly encouraged, see the
+  // StartTimeUnixNano is but strongly encouraged, see the
   // the detailed comments above Metric.
   //
   // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
@@ -405,7 +405,7 @@ message HistogramDataPoint {
   // attribute with the same key).
   repeated opentelemetry.proto.common.v1.KeyValue attributes = 9;
 
-  // StartTimeUnixNano is optional but strongly encouraged, see the
+  // StartTimeUnixNano is but strongly encouraged, see the
   // the detailed comments above Metric.
   //
   // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
@@ -431,9 +431,9 @@ message HistogramDataPoint {
   // Negative events *can* be recorded, but sum should not be filled out when
   // doing so.  This is specifically to enforce compatibility w/ OpenMetrics,
   // see: https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#histogram
-  optional double sum = 5;
+  double sum = 5;
 
-  // bucket_counts is an optional field contains the count values of histogram
+  // bucket_counts is an field contains the count values of histogram
   // for each bucket.
   //
   // The sum of the bucket_counts must equal the value in the count field.
@@ -466,10 +466,10 @@ message HistogramDataPoint {
   uint32 flags = 10;
 
   // min is the minimum value over (start_time, end_time].
-  optional double min = 11;
+  double min = 11;
 
   // max is the maximum value over (start_time, end_time].
-  optional double max = 12;
+  double max = 12;
 }
 
 // ExponentialHistogramDataPoint is a single data point in a timeseries that describes the
@@ -484,7 +484,7 @@ message ExponentialHistogramDataPoint {
   // attribute with the same key).
   repeated opentelemetry.proto.common.v1.KeyValue attributes = 1;
 
-  // StartTimeUnixNano is optional but strongly encouraged, see the
+  // StartTimeUnixNano is but strongly encouraged, see the
   // the detailed comments above Metric.
   //
   // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
@@ -510,7 +510,7 @@ message ExponentialHistogramDataPoint {
   // Negative events *can* be recorded, but sum should not be filled out when
   // doing so.  This is specifically to enforce compatibility w/ OpenMetrics,
   // see: https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#histogram
-  optional double sum = 5;
+  double sum = 5;
   
   // scale describes the resolution of the histogram.  Boundaries are
   // located at powers of the base, where:
@@ -574,10 +574,10 @@ message ExponentialHistogramDataPoint {
   repeated Exemplar exemplars = 11;
 
   // min is the minimum value over (start_time, end_time].
-  optional double min = 12;
+  double min = 12;
 
   // max is the maximum value over (start_time, end_time].
-  optional double max = 13;
+  double max = 13;
 
   // ZeroThreshold may be optionally set to convey the width of the zero
   // region. Where the zero region is defined as the closed interval
@@ -599,7 +599,7 @@ message SummaryDataPoint {
   // attribute with the same key).
   repeated opentelemetry.proto.common.v1.KeyValue attributes = 7;
 
-  // StartTimeUnixNano is optional but strongly encouraged, see the
+  // StartTimeUnixNano is but strongly encouraged, see the
   // the detailed comments above Metric.
   //
   // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
