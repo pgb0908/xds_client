@@ -147,6 +147,12 @@ void AdsClient::sendDiscoveryRequest(std::string type_url) {
     }
 
     std::cout << "Sending DiscoveryRequest for : " << type_url << ": " << request.ShortDebugString() << std::endl;
+
+    std::cout << "---------------- request ------------------" << std::endl;
+    std::cout <<  request.DebugString();
+    std::cout << "--------------- request -------------------" << std::endl;
+
+
     stream_->Write(request);
     first_stream_request_ = false;
 
@@ -166,6 +172,10 @@ void AdsClient::sendDiscoveryRequest(std::string type_url) {
 void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::DiscoveryResponse &message) {
     const std::string& type_url = message.type_url();
     std::cout << "Received gRPC message for " << type_url << " at version " << message.version_info() << std::endl;
+
+    std::cout << "---------------- response ------------------" << std::endl;
+    std::cout  << message.DebugString();
+    std::cout << "--------------- response -------------------" << std::endl;
 
     if (api_state_.count(type_url) == 0) {
         // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
@@ -207,12 +217,13 @@ void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::Discove
         }
         return;
     }
-    //ScopedResume same_type_resume;
+
+    ScopedResume same_type_resume;
     // We pause updates of the same type. This is necessary for SotW and GrpcMuxImpl, since unlike
     // delta and NewGRpcMuxImpl, independent watch additions/removals trigger updates regardless of
     // the delta state. The proper fix for this is to converge these implementations,
     // see https://github.com/envoyproxy/envoy/issues/11477.
-    //same_type_resume = pause(type_url);
+    same_type_resume = pause(type_url);
 
     try{
         std::vector<DecodedResourcePtr> resources;
@@ -268,14 +279,110 @@ void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::Discove
 
     api_state.previously_fetched_data_ = true;
     api_state.request_.set_response_nonce(message.nonce());
-    //ASSERT(api_state.paused());
+    assert(api_state.paused());
     queueDiscoveryRequest(type_url);
 }
 
 void
 AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &resources, AdsClient::ApiState &api_state,
                                      const std::string &type_url, const std::string &version_info, bool call_delegate) {
+    // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
+    // build a map here from resource name to resource and then walk watches_.
+    // We have to walk all watches (and need an efficient map as a result) to
+    // ensure we deliver empty config updates when a resource is dropped. We make the map ordered
+    // for test determinism.
+    std::unordered_map<std::string, std::reference_wrapper<DecodedResource>> resource_ref_map;
+    std::vector<std::reference_wrapper<DecodedResource>> all_resource_refs;
 
+    //const auto scoped_ttl_update = api_state.ttl_.scopedTtlUpdate();
+
+    for (const auto& resource : resources) {
+/*        if (resource->ttl()) {
+            api_state.ttl_.add(*resource->ttl(), resource->name());
+        } else {
+            api_state.ttl_.clear(resource->name());
+        }*/
+
+        all_resource_refs.emplace_back(*resource);
+        if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
+            // Sort the context params of an xdstp resource, so we can compare them easily.
+            auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource->name());
+            THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+            xds::core::v3::ResourceName xdstp_resource = resource_or_error.value();
+            XdsResourceIdentifier::EncodeOptions options;
+            options.sort_context_params_ = true;
+            resource_ref_map.emplace(XdsResourceIdentifier::encodeUrn(xdstp_resource, options),
+                                     *resource);
+        } else {
+            resource_ref_map.emplace(resource->name(), *resource);
+        }
+    }
+
+    // Execute external config validators if there are any watches.
+    if (!api_state.watches_.empty()) {
+        config_validators_->executeValidators(type_url, resources);
+    }
+
+    for (auto watch : api_state.watches_) {
+        // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
+        // Listener) even if the message does not have resources so that update_empty stat
+        // is properly incremented and state-of-the-world semantics are maintained.
+        if (watch->resources_.empty()) {
+            THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(all_resource_refs, version_info));
+            continue;
+        }
+        std::vector<DecodedResourceRef> found_resources;
+        for (const auto& watched_resource_name : watch->resources_) {
+            // Look for a singleton subscription.
+            auto it = resource_ref_map.find(watched_resource_name);
+            if (it != resource_ref_map.end()) {
+                found_resources.emplace_back(it->second);
+            } else if (isXdsTpWildcard(watched_resource_name)) {
+                // See if the resources match the xdstp wildcard subscription.
+                // Note: although it is unlikely that Envoy will need to support a resource that is mapped
+                // to both a singleton and collection watch, this code still supports this use case.
+                // TODO(abeyad): This could be made more efficient, e.g. by pre-computing and having a map
+                // entry for each wildcard watch.
+                for (const auto& resource_ref_it : resource_ref_map) {
+                    if (XdsResourceIdentifier::hasXdsTpScheme(resource_ref_it.first) &&
+                        convertToWildcard(resource_ref_it.first) == watched_resource_name) {
+                        found_resources.emplace_back(resource_ref_it.second);
+                    }
+                }
+            }
+        }
+
+        // onConfigUpdate should be called only on watches(clusters/listeners) that have
+        // updates in the message for EDS/RDS.
+        if (!found_resources.empty()) {
+            THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(found_resources, version_info));
+            // Resource cache is only used for EDS resources.
+            if (eds_resources_cache_ &&
+                (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
+                for (const auto& resource : found_resources) {
+                    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
+                            dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+                                    resource.get().resource());
+                    eds_resources_cache_->setResource(resource.get().name(), cluster_load_assignment);
+                }
+                // No need to remove resources from the cache, as currently only non-collection
+                // subscriptions are supported, and these resources are removed in the call
+                // to updateWatchInterest().
+            }
+        }
+    }
+
+    // All config updates have been applied without throwing an exception, so we'll call the xDS
+    // resources delegate, if any.
+    if (call_delegate && xds_resources_delegate_.has_value()) {
+        xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId{target_xds_authority_, type_url},
+                                                 all_resource_refs);
+    }
+
+    // TODO(mattklein123): In the future if we start tracking per-resource versions, we
+    // would do that tracking here.
+    api_state.request_.set_version_info(version_info);
+    Memory::Utils::tryShrinkHeap();
 }
 
 std::unique_ptr<Watcher> AdsClient::addWatch(const std::string &type_url, const std::set<std::string> &resources,
@@ -321,5 +428,30 @@ std::string AdsClient::truncateGrpcStatusMessage(std::string error_message) {
     ss << error_message.substr(0, kProtobufErrMsgLen) ;
     ss << (error_message.length() > kProtobufErrMsgLen ? "...(truncated)" : "");
     return ss.str();
+}
+
+ScopedResume AdsClient::pause(const std::string &type_url) {
+    return pause(std::vector<std::string>{type_url});
+}
+
+ScopedResume AdsClient::pause(const std::vector<std::string> type_urls) {
+    for (const auto& type_url : type_urls) {
+        ApiState& api_state = apiStateFor(type_url);
+        std::cout << "Pausing discovery requests for " << type_url << " (previous count "<< api_state.pauses_  << ")"<< std::endl;
+        ++api_state.pauses_;
+    }
+    return std::make_unique<Cleanup>([this, type_urls]() {
+        for (const auto& type_url : type_urls) {
+            ApiState& api_state = apiStateFor(type_url);
+            std::cout << "Decreasing pause count on discovery requests for " << type_url << " (previous count "<< api_state.pauses_  << ")"<< std::endl;
+            //ASSERT(api_state.paused());
+
+            if (--api_state.pauses_ == 0 && api_state.pending_ && api_state.subscribed_) {
+                std::cout << "Resuming discovery requests for  " << type_url << std::endl;
+                queueDiscoveryRequest(type_url);
+                api_state.pending_ = false;
+            }
+        }
+    });
 }
 

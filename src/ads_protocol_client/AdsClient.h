@@ -13,6 +13,7 @@
 #include "DecodedResource.h"
 #include "envoy/service/discovery/v3/ads.grpc.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "Cleanup.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -24,6 +25,7 @@ using envoy::service::discovery::v3::DiscoveryRequest;
 using envoy::service::discovery::v3::DiscoveryResponse;
 using envoy::config::core::v3::Node;
 
+using ScopedResume = std::unique_ptr<Cleanup>;
 
 class Watcher;
 
@@ -135,9 +137,13 @@ public:
     }
     void queueDiscoveryRequest(const std::string& queue_item);
 
+
+    ScopedResume pause(const std::string& type_url);
+    ScopedResume pause(const std::vector<std::string> type_urls);
+
     // Per muxed API state.
     struct ApiState {
-        ApiState(std::function<void(const std::vector<std::string>&)> callback){}
+        ApiState(const std::function<void(const std::vector<std::string>&)>& callback){}
 
         bool paused() const { return pauses_ > 0; }
 
