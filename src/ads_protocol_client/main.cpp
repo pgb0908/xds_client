@@ -14,7 +14,7 @@ int main(){
     client->setChannel(grpc::CreateChannel(endpoint,
                                            grpc::InsecureChannelCredentials()));
 
-    auto temp_decoder = std::make_shared<OpaqueResourceDecoderImpl<envoy::config::cluster::v3::Cluster>>("cluster");
+    auto temp_decoder = std::make_shared<OpaqueResourceDecoderImpl<envoy::config::cluster::v3::Cluster>>("name");
     std::shared_ptr<OpaqueResourceDecoder> cluster_decoder = temp_decoder;
     std::set<std::string> empty_list;
     std::string type_url = "type.googleapis.com/envoy.config.cluster.v3.Cluster";

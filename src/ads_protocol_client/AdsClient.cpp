@@ -8,6 +8,7 @@
 #include "DecodedResource.h"
 #include "Watcher.h"
 #include "Status.h"
+#include "xds/core/v3/resource_name.pb.h"
 
 void AdsClient::onStreamEstablished() {
     stream_ = stub_->StreamAggregatedResources(&context_);
@@ -308,7 +309,7 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
         std::cout << "resource->name() : " << resource->name() << std::endl;
 
 
-/*        if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
+        if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
             // Sort the context params of an xdstp resource, so we can compare them easily.
             auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource->name());
             THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
@@ -319,7 +320,7 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
                                      *resource);
         } else {
             resource_ref_map.emplace(resource->name(), *resource);
-        }*/
+        }
     }
 
     // Execute external config validators if there are any watches.

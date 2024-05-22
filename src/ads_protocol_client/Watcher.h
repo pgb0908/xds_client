@@ -8,6 +8,7 @@
 #include <set>
 #include "AdsClient.h"
 #include "OpaqueResourceDecoder.h"
+#include "XdsResource.h"
 
 class Watcher {
 public:
@@ -21,7 +22,7 @@ public:
               watches_(parent.apiStateFor(type_url).watches_)
     //eds_resources_cache_(eds_resources_cache)
     {
-       // updateResources(resources);
+        // updateResources(resources);
     }
 
     ~Watcher() {
@@ -56,27 +57,27 @@ private:
     void updateResources(const std::set<std::string> &resources) {
         // 함수 끝까지 현재 리소스 세트를 유지하고 차이를 계산하여 제거된 리소스 목록을 찾는 방법입니다.
         // 업데이트 이전에 리소스를 일시적으로 유지하여 제거된 리소스를 찾습니다.
-/*        std::set<std::string> previous_resources;
+        std::set<std::string> previous_resources;
         previous_resources.swap(resources_);
         std::transform(
                 resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()),
                 [this](const std::string &resource_name) -> std::string {
 
-                    *//*                  if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
-                                          auto xdstp_resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
-                                          THROW_IF_STATUS_NOT_OK(xdstp_resource_or_error, throw);
-                                          auto xdstp_resource = xdstp_resource_or_error.value();
-                                          if (subscription_options_.add_xdstp_node_context_params_) {
-                                              const auto context = XdsContextParams::encodeResource(
-                                                      local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
-                                              xdstp_resource.mutable_context()->CopyFrom(context);
-                                          }
-                                          XdsResourceIdentifier::EncodeOptions encode_options;
-                                          encode_options.sort_context_params_ = true;
-                                          return XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options);
-                                      }*//*
+                    if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
+                        auto xdstp_resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
+                        THROW_IF_STATUS_NOT_OK(xdstp_resource_or_error, throw);
+                        auto xdstp_resource = xdstp_resource_or_error.value();
+                        if (subscription_options_.add_xdstp_node_context_params_) {
+                            const auto context = XdsContextParams::encodeResource(
+                                    local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
+                            xdstp_resource.mutable_context()->CopyFrom(context);
+                        }
+                        XdsResourceIdentifier::EncodeOptions encode_options;
+                        encode_options.sort_context_params_ = true;
+                        return XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options);
+                    }
                     return resource_name;
-                });*/
+                });
 /*        if (eds_resources_cache_.has_value()) {
             // Compute the removed resources and remove them from the cache.
             std::set<std::string> removed_resources;

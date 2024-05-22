@@ -42,6 +42,10 @@ namespace {
         //validate(typed_message, validation_visitor);
     };
 
+    static google::protobuf::Message *createReflectableMessage(const google::protobuf::Message &message) {
+        return const_cast<google::protobuf::Message*>(&message);
+    }
+
     /**
      * Obtain a string field from a protobuf message dynamically.
      *
@@ -52,7 +56,12 @@ namespace {
      */
     static inline std::string getStringField(const google::protobuf::Message& message,
                                              const std::string& field_name) {
-        return "";
+        ::google::protobuf::Message* reflectable_message = createReflectableMessage(message);
+        const google::protobuf::Descriptor* descriptor = reflectable_message->GetDescriptor();
+        const google::protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
+        const google::protobuf::Reflection* reflection = reflectable_message->GetReflection();
+        return reflection->GetString(*reflectable_message, name_field);
+        //return name_field->name();
     }
 
 }
