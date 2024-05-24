@@ -6,14 +6,14 @@
 #define XDS_CLIENT_RESOURCENAME_H
 
 #include <string>
+#include "Protobuf.h"
 
 /**
  * Get resource name from api type.
  */
 template <typename Current>
 std::string getResourceName() {
-  //  return createReflectableMessage(Current())->GetDescriptor()->full_name();
-  return "";
+  return createReflectableMessage(Current())->GetDescriptor()->full_name();
 }
 
 /**

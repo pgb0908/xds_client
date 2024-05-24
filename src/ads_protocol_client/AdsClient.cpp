@@ -306,10 +306,7 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
 
         all_resource_refs.emplace_back(*resource);
 
-        std::cout << "resource->name() : " << resource->name() << std::endl;
-
-
-        if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
+/*        if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
             // Sort the context params of an xdstp resource, so we can compare them easily.
             auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource->name());
             THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
@@ -320,7 +317,9 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
                                      *resource);
         } else {
             resource_ref_map.emplace(resource->name(), *resource);
-        }
+        }*/
+
+        resource_ref_map.emplace(resource->name(), *resource);
     }
 
     // Execute external config validators if there are any watches.
@@ -332,17 +331,19 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
         // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
         // Listener) even if the message does not have resources so that update_empty stat
         // is properly incremented and state-of-the-world semantics are maintained.
-/*        if (watch->resources_.empty()) {
-            THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(all_resource_refs, version_info));
+        if (watch->resources_.empty()) {
+            //THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(all_resource_refs, version_info));
+            /// watch를 통해 관련 config 업데이트 함
             continue;
-        }*/
-/*        std::vector<std::reference_wrapper<DecodedResource>>> found_resources;
+        }
+        std::vector<std::reference_wrapper<DecodedResource>> found_resources;
         for (const auto& watched_resource_name : watch->resources_) {
             // Look for a singleton subscription.
             auto it = resource_ref_map.find(watched_resource_name);
             if (it != resource_ref_map.end()) {
                 found_resources.emplace_back(it->second);
-            } else if (isXdsTpWildcard(watched_resource_name)) {
+            }
+/*            else if (isXdsTpWildcard(watched_resource_name)) {
                 // See if the resources match the xdstp wildcard subscription.
                 // Note: although it is unlikely that Envoy will need to support a resource that is mapped
                 // to both a singleton and collection watch, this code still supports this use case.
@@ -354,13 +355,13 @@ AdsClient::processDiscoveryResources(const std::vector<DecodedResourcePtr> &reso
                         found_resources.emplace_back(resource_ref_it.second);
                     }
                 }
-            }
-        }*/
+            }*/
+        }
 
         // onConfigUpdate should be called only on watches(clusters/listeners) that have
         // updates in the message for EDS/RDS.
 /*        if (!found_resources.empty()) {
-            THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(found_resources, version_info));
+            //THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(found_resources, version_info));
             // Resource cache is only used for EDS resources.
             if (eds_resources_cache_ &&
                 (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {

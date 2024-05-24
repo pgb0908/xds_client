@@ -30,6 +30,31 @@ using ScopedResume = std::unique_ptr<Cleanup>;
 
 class Watcher;
 
+namespace {
+/*    // Returns true if `resource_name` contains the wildcard XdsTp resource, for example:
+    // xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/*
+    // xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/*?node.name=my_node
+    bool isXdsTpWildcard(const std::string& resource_name) {
+        return XdsResourceIdentifier::hasXdsTpScheme(resource_name) &&
+               (absl::EndsWith(resource_name, "/*") || absl::StrContains(resource_name, "/*?"));
+    }
+
+    // Converts the XdsTp resource name to its wildcard equivalent.
+    // Must only be called on XdsTp resource names.
+    std::string convertToWildcard(const std::string& resource_name) {
+        //ASSERT(XdsResourceIdentifier::hasXdsTpScheme(resource_name));
+        auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
+        THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+        xds::core::v3::ResourceName xdstp_resource = resource_or_error.value();
+        const auto pos = xdstp_resource.id().find_last_of('/');
+        xdstp_resource.set_id(
+                pos == std::string::npos ? "*" : absl::StrCat(xdstp_resource.id().substr(0, pos), "/*"));
+        XdsResourceIdentifier::EncodeOptions options;
+        options.sort_context_params_ = true;
+        return XdsResourceIdentifier::encodeUrn(xdstp_resource, options);
+    }*/
+}
+
 class AdsClient {
 public:
     // Constructor

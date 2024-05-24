@@ -3,6 +3,7 @@
 //
 
 #include "HttpUtility.h"
+#include "fmt/format.h"
 
 
 
@@ -46,7 +47,7 @@ std::string PercentEncoding::encode(std::string value, const size_t index,
 
 std::string PercentEncoding::decode(std::string encoded) {
     std::string decoded;
-    decoded.reserve(encoded.size());
+/*    decoded.reserve(encoded.size());
     for (size_t i = 0; i < encoded.size(); ++i) {
         char ch = encoded[i];
         if (ch == '%' && i + 2 < encoded.size()) {
@@ -69,7 +70,7 @@ std::string PercentEncoding::decode(std::string encoded) {
             }
         }
         decoded.push_back(ch);
-    }
+    }*/
     return decoded;
 }
 
@@ -109,14 +110,14 @@ namespace {
             0b00000000000000000000000000000000,
     };
 
-    bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTable, c); }
+   // bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTable, c); }
 
-    bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
+   // bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
 } // namespace
 
 std::string PercentEncoding::urlEncodeQueryParameter(std::string value) {
     std::string encoded;
-    encoded.reserve(value.size());
+/*    encoded.reserve(value.size());
     for (char ch : value) {
         if (shouldPercentEncodeChar(ch)) {
             // For consistency, URI producers should use uppercase hexadecimal digits for all
@@ -125,13 +126,13 @@ std::string PercentEncoding::urlEncodeQueryParameter(std::string value) {
         } else {
             encoded.push_back(ch);
         }
-    }
+    }*/
     return encoded;
 }
 
 std::string PercentEncoding::urlDecodeQueryParameter(std::string encoded) {
     std::string decoded;
-    decoded.reserve(encoded.size());
+/*    decoded.reserve(encoded.size());
     for (size_t i = 0; i < encoded.size(); ++i) {
         char ch = encoded[i];
         if (ch == '%' && i + 2 < encoded.size()) {
@@ -164,7 +165,7 @@ std::string PercentEncoding::urlDecodeQueryParameter(std::string encoded) {
         } else {
             decoded.push_back(ch);
         }
-    }
+    }*/
     return decoded;
 }
 

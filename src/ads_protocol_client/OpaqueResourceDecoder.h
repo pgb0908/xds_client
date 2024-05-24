@@ -9,6 +9,8 @@
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "protofile/text_format_transcoder.h"
+#include "Protobuf.h"
+
 namespace {
     static void unpackToOrThrow(const google::protobuf::Any& any_message, google::protobuf::Message& message) {
         if (!message.ParseFromString(any_message.value())) {
@@ -42,9 +44,6 @@ namespace {
         //validate(typed_message, validation_visitor);
     };
 
-    static google::protobuf::Message *createReflectableMessage(const google::protobuf::Message &message) {
-        return const_cast<google::protobuf::Message*>(&message);
-    }
 
     /**
      * Obtain a string field from a protobuf message dynamically.

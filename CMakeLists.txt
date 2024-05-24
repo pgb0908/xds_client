@@ -31,5 +31,8 @@ endif()
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 
+find_package(fmt)
+
+
 add_subdirectory(schema)
 add_subdirectory(src)

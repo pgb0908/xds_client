@@ -63,9 +63,9 @@ private:
                 resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()),
                 [this](const std::string &resource_name) -> std::string {
 
-                    if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
+/*                    if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
                         auto xdstp_resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
-                        THROW_IF_STATUS_NOT_OK(xdstp_resource_or_error, throw);
+                        //THROW_IF_STATUS_NOT_OK(xdstp_resource_or_error, throw);
                         auto xdstp_resource = xdstp_resource_or_error.value();
                         if (subscription_options_.add_xdstp_node_context_params_) {
                             const auto context = XdsContextParams::encodeResource(
@@ -75,7 +75,8 @@ private:
                         XdsResourceIdentifier::EncodeOptions encode_options;
                         encode_options.sort_context_params_ = true;
                         return XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options);
-                    }
+                    }*/
+
                     return resource_name;
                 });
 /*        if (eds_resources_cache_.has_value()) {
