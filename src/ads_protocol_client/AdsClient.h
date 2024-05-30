@@ -14,6 +14,8 @@
 #include "envoy/service/discovery/v3/ads.grpc.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/route//v3/route.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "Cleanup.h"
 
 using grpc::Channel;

@@ -214,7 +214,7 @@ void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::Discove
             // updating the version).
             //ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
             std::cout << "Ignoring unwatched type URL " << type_url<< std::endl;
-            queueDiscoveryRequest(type_url);
+            //queueDiscoveryRequest(type_url);
         }
         return;
     }
