@@ -8,6 +8,7 @@
 #include <grpc++/grpc++.h>
 #include <thread>
 #include <queue>
+#include <grpcpp/alarm.h>
 #include "memory"
 #include "ResourceName.h"
 #include "DecodedResource.h"
@@ -84,74 +85,6 @@ public:
 
     void onDiscoveryResponse(const envoy::service::discovery::v3::DiscoveryResponse& message);
 
-    void continueChat(){
-        std::cout << "================ request =======================" << std::endl;
-        // do
-        discoveryRequest_.set_version_info(version_info_);
-        discoveryRequest_.set_response_nonce(nonce_);
-        //discoveryRequest.mutable_type_url()->append("type.googleapis.com/envoy.config.route.v3.RouteConfiguration");
-        //discoveryRequest.mutable_type_url()->append("type.googleapis.com/envoy.api.v3.Cluster");
-        //discoveryRequest.add_resource_names("dddd");
-
-        std::cout << "version-info : " << discoveryRequest_.version_info() << std::endl;
-        std::cout << "response-nonce : " << discoveryRequest_.response_nonce() << std::endl;
-        std::cout << "type-url : " << discoveryRequest_.type_url() << std::endl;
-        std::cout << "Resources-names : "  << std::endl;
-        for (const auto& resource : discoveryRequest_.resource_names()) {
-            std::cout << "  Resource Type URL: " << resource << std::endl;
-        }
-
-        stream_->Write(discoveryRequest_);
-        //stream_->WritesDone();
-
-        isOk = true;
-    }
-
-    bool AggregatedDiscoveryService(){
-        std::cout << "================ request =======================" << std::endl;
-        // do
-        discoveryRequest_.set_version_info("");
-        auto node_data = discoveryRequest_.mutable_node();
-        node_data->mutable_cluster()->append("test-cluster");
-        node_data->mutable_id()->append("test-id");
-        discoveryRequest_.set_type_url("type.googleapis.com/envoy.config.cluster.v3.Cluster");
-        //discoveryRequest.mutable_type_url()->append("type.googleapis.com/envoy.config.route.v3.RouteConfiguration");
-        //discoveryRequest.mutable_type_url()->append("type.googleapis.com/envoy.api.v3.Cluster");
-        //discoveryRequest_.add_resource_names("*");
-
-        std::cout << "version-info : " << discoveryRequest_.version_info() << std::endl;
-        std::cout << "response-nonce : " << discoveryRequest_.response_nonce() << std::endl;
-        std::cout << "type-url : " << discoveryRequest_.type_url() << std::endl;
-        std::cout << "Resources-names : "  << std::endl;
-        for (const auto& resource : discoveryRequest_.resource_names()) {
-            std::cout << "  Resource Type URL: " << resource << std::endl;
-        }
-
-        stream_->Write(discoveryRequest_);
-
-
-        DiscoveryResponse discoveryResponse;
-        while(stream_->Read(&discoveryResponse)){
-            version_info_ = discoveryResponse.version_info();
-            nonce_ = discoveryResponse.nonce();
-            std::cout << "================ response =======================" << std::endl;
-            std::cout << discoveryResponse.ShortDebugString() << std::endl;
-            std::cout << "version-info : " << discoveryResponse.version_info() << std::endl;
-            std::cout << "nonce : " << discoveryResponse.nonce() << std::endl;
-            std::cout << "type-url : " << discoveryResponse.type_url() << std::endl;
-
-
-            std::cout << "Resources : "  << std::endl;
-            for (const auto& resource : discoveryResponse.resources()) {
-                envoy::config::cluster::v3::Cluster r;
-                unpackToOrThrow(resource, r);
-                std::cout << "  r : " << r.DebugString() << std::endl;
-            }
-            continueChat();
-        }
-
-        return isOk;
-    }
 
     void unpackToOrThrow(const google::protobuf::Any& any_message, google::protobuf::Message& message) {
         if (!message.ParseFromString(any_message.value())) {
@@ -212,14 +145,20 @@ private:
     }
 
     std::unique_ptr<AggregatedDiscoveryService::Stub> stub_;
-    ClientContext context_;
+
     bool first_{true};
     bool isOk{false};
     std::string version_info_;
     std::string nonce_;
     DiscoveryRequest discoveryRequest_;
-    //ClientContext context_;
-    std::shared_ptr<grpc::ClientReaderWriter<DiscoveryRequest, DiscoveryResponse>> stream_;
+
+    //std::shared_ptr<grpc::ClientReaderWriter<DiscoveryRequest, DiscoveryResponse>> stream_;
+    std::unique_ptr< ::grpc::ClientAsyncReaderWriter<DiscoveryRequest, DiscoveryResponse>> rpc_;
+
+    grpc::CompletionQueue cq_;
+    grpc::Status status_;
+    ClientContext context_;
+    grpc::Alarm alarm_;
 
     void clearNonce();
 
@@ -267,6 +206,8 @@ private:
 
         return struct_data;
     }
+
+    void recieveResponse();
 };
 
 

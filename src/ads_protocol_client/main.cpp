@@ -13,6 +13,9 @@ int main(){
     auto client = config.build();
     client->setChannel(grpc::CreateChannel(endpoint,
                                            grpc::InsecureChannelCredentials()));
+    client->onStreamEstablished();
+
+
 
     auto temp_decoder = std::make_shared<OpaqueResourceDecoderImpl<envoy::config::cluster::v3::Cluster>>("name");
     std::shared_ptr<OpaqueResourceDecoder> cluster_decoder = temp_decoder;
@@ -22,8 +25,6 @@ int main(){
                      empty_list, cluster_decoder);
     client->apiStateFor(type_url).watches_.push_back(watcher.get());
 
-
-    client->onStreamEstablished();
 
     auto temp_decoder2 = std::make_shared<OpaqueResourceDecoderImpl<envoy::config::listener::v3::Listener>>("listener");
     std::shared_ptr<OpaqueResourceDecoder> listener_decoder = temp_decoder2;
@@ -36,6 +37,8 @@ int main(){
 
     //client->AggregatedDiscoveryService();
     //grpc::CreateInsecureChannelFromFd();
+
+    std::this_thread::sleep_for(std::chrono::seconds(20));
 
     client->shutdown();
 

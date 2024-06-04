@@ -11,10 +11,15 @@
 #include "xds/core/v3/resource_name.pb.h"
 
 void AdsClient::onStreamEstablished() {
-    stream_ = stub_->StreamAggregatedResources(&context_);
+    void* on_tag;
+    rpc_ = stub_->PrepareAsyncStreamAggregatedResources(&context_, &cq_);
+    //alarm_.Set(&cq_, std::chrono::system_clock::now()+std::chrono::seconds(3), &on_tag);
 
-    std::cout << "hello" << std::endl;
-    if (stream_) {
+    if (rpc_) {
+        bool ok;
+        void* on_tag;
+        rpc_->StartCall(&on_tag);
+        cq_.Next(&on_tag, &ok);
         first_stream_request_ = true;
         clearNonce();
         request_queue_ = std::make_unique<std::queue<std::string>>();
@@ -27,12 +32,15 @@ void AdsClient::onStreamEstablished() {
 }
 
 void AdsClient::endStream() {
-    stream_->WritesDone();
-    Status status = stream_->Finish();
+    Status status;
+    void* on_tag;
+
+    rpc_->Finish(&status, &on_tag);
     if (!status.ok()) {
         std::cout << "rpc failed" << std::endl;
     }
     std::cout << "end stream" << std::endl;
+    cq_.Shutdown();
 }
 
 
@@ -85,7 +93,7 @@ void AdsClient::clearNonce() {
 
 
 void AdsClient::queueDiscoveryRequest(const std::string &queue_item) {
-    if (stream_ == nullptr) {
+    if (rpc_ == nullptr) {
         std::cout << "No stream available to queueDiscoveryRequest for " << queue_item << std::endl;
         return; // Drop this request; the reconnect will enqueue a new one.
     }
@@ -153,21 +161,41 @@ void AdsClient::sendDiscoveryRequest(std::string type_url) {
     std::cout <<  request.DebugString();
     std::cout << "--------------- request -------------------" << std::endl;
 
+    {
+        void* on_tag;
+        bool ok = false;
+        rpc_->Write(request, &on_tag);
+        cq_.Next(&on_tag, &ok);
+        first_stream_request_ = false;
 
-    stream_->Write(request);
-    first_stream_request_ = false;
+        // clear error_detail after the request is sent if it exists.
+        if (apiStateFor(type_url).request_.has_error_detail()) {
+            apiStateFor(type_url).request_.clear_error_detail();
+        }
 
-    // clear error_detail after the request is sent if it exists.
-    if (apiStateFor(type_url).request_.has_error_detail()) {
-        apiStateFor(type_url).request_.clear_error_detail();
+
+        if(ok){
+            recieveResponse();
+            std::cout << "rpc write success!!!" << std::endl;
+        }else{
+            std::cout << "rpc write fail!!!" << std::endl;
+        }
     }
 
+    {
 
-    DiscoveryResponse discoveryResponse;
-    while (stream_->Read(&discoveryResponse)) {
-        onDiscoveryResponse(discoveryResponse);
+/*        while(cq_.Next(&on_tag, &ok)){
+            if(on_tag == nullptr){
+                std::cout << "alarm triggered" << std::endl;
+                alarm_.Set(&cq_, std::chrono::system_clock::now()+std::chrono::seconds(1), &on_tag);
+                break;
+            }
+
+*//*            DiscoveryResponse discoveryResponse;
+            rpc_->Read(&discoveryResponse, &on_tag);
+            onDiscoveryResponse(discoveryResponse);*//*
+        }*/
     }
-
 }
 
 void AdsClient::onDiscoveryResponse(const envoy::service::discovery::v3::DiscoveryResponse &message) {
@@ -456,5 +484,22 @@ ScopedResume AdsClient::pause(const std::vector<std::string> type_urls) {
             }
         }
     });
+}
+
+void AdsClient::recieveResponse() {
+    void* on_tag;
+    bool ok;
+
+    DiscoveryResponse discoveryResponse;
+    rpc_->Read(&discoveryResponse, &on_tag);
+    cq_.Next(&on_tag, &ok);
+
+    if(on_tag){
+        std::cout << "rpc read success!!!" << std::endl;
+        onDiscoveryResponse(discoveryResponse);
+    }else{
+        std::cout << "rpc read fail!!!" << std::endl;
+    }
+
 }
 
