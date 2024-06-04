@@ -112,7 +112,23 @@ endmacro(proto_service_generate)
 
 #[[protobuf_generate_cpp(proto_srcs proto_hdrs ${PROTO_SRC_DIR} ${proto})
 grpc_generate_cpp(grpc_srcs grpc_hdrs ${PROTO_SRC_DIR} ${proto})]]
-proto_service_generate(proto proto GLOB_RECURSE)
+
+proto_generate(proto/google proto GLOB_RECURSE)
+proto_generate(proto/io proto GLOB_RECURSE)
+proto_generate(proto/opencensus proto GLOB_RECURSE)
+proto_generate(proto/opentelemetry proto GLOB_RECURSE)
+proto_generate(proto/udpa proto GLOB_RECURSE)
+proto_generate(proto/validate proto GLOB_RECURSE)
+proto_generate(proto/xds proto GLOB_RECURSE)
+proto_generate(proto/envoy/admin proto GLOB_RECURSE)
+proto_generate(proto/envoy/annotations proto GLOB_RECURSE)
+proto_generate(proto/envoy/api proto GLOB_RECURSE)
+proto_generate(proto/envoy/config proto GLOB_RECURSE)
+proto_generate(proto/envoy/data proto GLOB_RECURSE)
+proto_generate(proto/envoy/extensions proto GLOB_RECURSE)
+proto_generate(proto/envoy/type proto GLOB_RECURSE)
+proto_generate(proto/envoy/watchdog proto GLOB_RECURSE)
+proto_service_generate(proto/envoy/service proto GLOB_RECURSE)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/proto-src/proto)
 
