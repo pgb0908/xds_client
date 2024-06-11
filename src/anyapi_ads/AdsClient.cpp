@@ -39,16 +39,17 @@ namespace anyapi {
 
 
     void AdsClient::subscribeCDS() {
-        State state;
-        state.key_.name_ = "cds";
-        state.key_.type_url_ = "type.googleapis.com/envoy.config.cluster.v3.Cluster";
-        state.resourceDecoderPtr_ = std::make_shared<ResourceDecoderImpl<envoy::config::cluster::v3::Cluster>>("name");
-        states_.emplace(state.key_.type_url_, state);
-
-        std::cout << "subscribeCDS" << std::endl;
+        auto state = std::make_unique<State>();
+        state->key_.name_ = "cds";
+        state->key_.type_url_ = "type.googleapis.com/envoy.config.cluster.v3.Cluster";
+        state->resourceDecoderPtr_ = std::make_shared<ResourceDecoderImpl<envoy::config::cluster::v3::Cluster>>("name");
 
         // request-queue 요청 집어넣음
-        request_queue_.push(state);
+        request_queue_.push(state.get());
+
+        states_.emplace(state->key_.type_url_, std::move(state));
+
+        std::cout << "subscribeCDS" << std::endl;
     }
 
     void AdsClient::subscribeEDS() {
@@ -61,7 +62,7 @@ namespace anyapi {
         if(!request_queue_.empty()){
             while(!request_queue_.empty()){
                 auto state = request_queue_.front();
-                auto ok = sendDiscoveryRequest(state);
+                auto ok = sendDiscoveryRequest(*state);
 
                 request_queue_.pop();
             }
@@ -127,14 +128,14 @@ namespace anyapi {
         auto api_state = states_.find(type_url);
         if (api_state == states_.end()) {
             // update the nonce as we are processing this response.
-            api_state->second.discoveryRequest_.set_response_nonce(discoveryResponse.nonce());
+            api_state->second->discoveryRequest_.set_response_nonce(discoveryResponse.nonce());
             if (discoveryResponse.resources().empty()) {
                 // No watches and no resources. This can happen when envoy unregisters from a
                 // resource that's removed from the server as well. For example, a deleted cluster
                 // triggers un-watching the ClusterLoadAssignment watch, and at the same time the
                 // xDS server sends an empty list of ClusterLoadAssignment resources. we'll accept
                 // this update. no need to send a discovery request, as we don't watch for anything.
-                api_state->second.discoveryRequest_.set_version_info(discoveryResponse.version_info());
+                api_state->second->discoveryRequest_.set_version_info(discoveryResponse.version_info());
             } else {
                 // No watches and we have resources - this should not happen. send a NACK (by not
                 // updating the version).
@@ -149,7 +150,7 @@ namespace anyapi {
 
         try {
             std::vector<DecodedResourcePtr> resources;
-            auto resource_decoder = api_state->second.resourceDecoderPtr_;
+            auto resource_decoder = api_state->second->resourceDecoderPtr_;
 
             for (const auto &resource: discoveryResponse.resources()) {
                 // TODO(snowp): Check the underlying type when the resource is a Resource.
@@ -164,12 +165,12 @@ namespace anyapi {
                     throw std::runtime_error(ss.str());
                 }
 
-                auto decoded = api_state->second.resourceDecoderPtr_->decodeResource(resource);
+                auto decoded = api_state->second->resourceDecoderPtr_->decodeResource(resource);
                 std::cout << "---------------- decoded resource ------------------" << std::endl;
                 std::cout << decoded->DebugString() << std::endl;
 
                 auto decoded_resource = std::make_unique<DecodedResource>();
-                auto resource_name = api_state->second.resourceDecoderPtr_->resourceName(*decoded);
+                auto resource_name = api_state->second->resourceDecoderPtr_->resourceName(*decoded);
 
                 decoded_resource->has_resource_ = true;
                 decoded_resource->version_ = discoveryResponse.version_info();
@@ -184,19 +185,20 @@ namespace anyapi {
 
             }
 
-            resourceUpdate(resources, api_state->second, type_url, discoveryResponse.version_info());
+            resourceUpdate(resources, *(api_state->second),
+                           type_url, discoveryResponse.version_info());
 
 
         } catch (std::exception &e) {
-            ::google::rpc::Status *error_detail = api_state->second.discoveryRequest_.mutable_error_detail();
+            ::google::rpc::Status *error_detail = api_state->second->discoveryRequest_.mutable_error_detail();
             error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
             error_detail->set_message(truncateGrpcStatusMessage(e.what()));
         }
 
-        api_state->second.discoveryRequest_.set_response_nonce(discoveryResponse.nonce());
+        api_state->second->discoveryRequest_.set_response_nonce(discoveryResponse.nonce());
 
         // request-queue 요청 집어넣음
-        request_queue_.push(api_state->second);
+        request_queue_.push(api_state->second.get());
     }
 
 
@@ -243,7 +245,7 @@ namespace anyapi {
         }
 
         for(auto& watch : states_){
-            if (watch.second.resources_.empty()) {
+            if (watch.second->resources_.empty()) {
                 // 모든 config 적용
                 // all_resource_refs 적용
 
@@ -255,7 +257,7 @@ namespace anyapi {
             }
 
             std::vector<std::reference_wrapper<DecodedResource>> found_resources;
-            for (const auto &watched_resource_name: watch.second.resources_) {
+            for (const auto &watched_resource_name: watch.second->resources_) {
                 // Look for a singleton subscription.
                 auto it = resource_ref_map.find(watched_resource_name);
                 if (it != resource_ref_map.end()) {
@@ -290,7 +292,7 @@ namespace anyapi {
     void AdsClient::clearNonce() {
         // Iterate over all api_states (for each type_url), and clear its nonce.
         for(auto& [type_url, api_state] : states_){
-            api_state.discoveryRequest_.clear_response_nonce();
+            api_state->discoveryRequest_.clear_response_nonce();
         }
     }
 

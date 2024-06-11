@@ -165,10 +165,10 @@ namespace anyapi{
 
         bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
             return !resource.has_resource_&&
-                   resource.version_ == states_[type_url].discoveryRequest_.version_info();
+                   resource.version_ == states_[type_url]->discoveryRequest_.version_info();
         }
 
-        std::map<std::string, State> states_; // type_url, state
+        std::map<std::string, std::unique_ptr<State>> states_; // type_url, state
         //std::map<std::string, DecodedResource> resource_map;  // type_url, DecodedResource
 
         std::unique_ptr<AggregatedDiscoveryService::Stub> stub_;
@@ -176,7 +176,7 @@ namespace anyapi{
         grpc::CompletionQueue cq_;
         grpc::Status status_;
         ClientContext context_;
-        std::queue<State> request_queue_;
+        std::queue<State*> request_queue_;
 
 
         google::protobuf::Struct build_struct(const std::vector<std::pair<std::string,std::string>>& keyValue){
