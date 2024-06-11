@@ -238,67 +238,13 @@ namespace anyapi {
     AdsClient::resourceUpdate(const std::vector<DecodedResourcePtr> &resources, State &state,
                               const std::string &type_url, const std::string &version_info) {
 
-        // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
-        // build a map here from resource name to resource and then walk watches_.
-        // We have to walk all watches (and need an efficient map as a result) to
-        // ensure we deliver empty config updates when a resource is dropped. We make the map ordered
-        // for test determinism.
-        std::unordered_map<std::string, std::reference_wrapper<DecodedResource>> resource_ref_map;
-        std::vector<std::reference_wrapper<DecodedResource>> all_resource_refs;
 
-        //const auto scoped_ttl_update = api_state.ttl_.scopedTtlUpdate();
+        // cds이면 eds에 대한 구독요청을 큐에 집어 넣음
+        if(state.key_.name_ == "cds"){
 
-        for (const auto &resource: resources) {
-/*        if (resource->ttl()) {
-            api_state.ttl_.add(*resource->ttl(), resource->name());
-        } else {
-            api_state.ttl_.clear(resource->name());
-        }*/
-
-            all_resource_refs.emplace_back(*resource);
-            resource_ref_map.emplace(resource->name_, *resource);
+            // cluster의 타입이 EDS인 경우에만 EDS 후속 진행
+            subscribeEDS(resources);
         }
-
-        for(auto& watch : states_){
-            if (watch.second->watched_resources_.empty()) {
-                // 모든 config 적용
-                // all_resource_refs 적용
-
-                // cds이면 eds에 대한 구독요청을 큐에 집어 넣음
-                subscribeEDS(resources);
-
-                continue;
-            }
-
-            std::vector<std::reference_wrapper<DecodedResource>> found_resources;
-            for (const auto &watched_resource_name: watch.second->watched_resources_) {
-                // Look for a singleton subscription.
-                auto it = resource_ref_map.find(watched_resource_name);
-                if (it != resource_ref_map.end()) {
-                    found_resources.emplace_back(it->second);
-                }
-            }
-
-            // onConfigUpdate should be called only on watches(clusters/listeners) that have
-            // updates in the message for EDS/RDS.
-            if (!found_resources.empty()) {
-                // Resource cache is only used for EDS resources.
-/*                if (type_url == "type.googleapis.com/envoy::config::endpoint::v3::ClusterLoadAssignment") {
-                    for (const auto &resource: found_resources) {
-                        const envoy::config::endpoint::v3::ClusterLoadAssignment &cluster_load_assignment =
-                                dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment &>(
-                                        resource.get().resource_);
-                        eds_resources_cache_->setResource(resource.get().name_, cluster_load_assignment);
-                    }
-                    // No need to remove resources from the cache, as currently only non-collection
-                    // subscriptions are supported, and these resources are removed in the call
-                    // to updateWatchInterest().
-                }*/
-            }
-        }
-
-
-
 
         state.discoveryRequest_.set_version_info(version_info);
     }
