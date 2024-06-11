@@ -5,7 +5,7 @@
 #include "AdsClient.h"
 
 int main(){
-    std::string endpoint = "127.0.0.1:18000";
+    std::string endpoint = "127.0.0.1:9002";
 
     anyapi::AdsClient client(endpoint);
 

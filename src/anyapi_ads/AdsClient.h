@@ -139,7 +139,7 @@ namespace anyapi{
         DiscoveryRequest discoveryRequest_;
         bool subscribed_{false};
         std::shared_ptr<ResourceDecoder> resourceDecoderPtr_;
-        std::vector<std::string> resources_;
+        std::vector<std::string> watched_resources_;
     };
 
     using DecodedResourcePtr = std::unique_ptr<DecodedResource>;
@@ -155,9 +155,9 @@ namespace anyapi{
 
     private:
         void subscribeCDS();
-        void subscribeEDS();
+        void subscribeEDS(const std::vector<DecodedResourcePtr>& resources);
 
-        bool sendDiscoveryRequest(State& requestInfo);
+        bool sendDiscoveryRequest(std::string& type_url);
 
         void receiveResponse();
         void processResponse(const DiscoveryResponse& discoveryResponse);
@@ -176,7 +176,7 @@ namespace anyapi{
         grpc::CompletionQueue cq_;
         grpc::Status status_;
         ClientContext context_;
-        std::queue<State*> request_queue_;
+        std::queue<std::string> request_queue_;
 
 
         google::protobuf::Struct build_struct(const std::vector<std::pair<std::string,std::string>>& keyValue){
@@ -204,7 +204,7 @@ namespace anyapi{
             return node;
         }
 
-        void resourceUpdate(const std::vector<DecodedResourcePtr>& vector1, State& state,
+        void resourceUpdate(const std::vector<DecodedResourcePtr>& resources, State& state,
                             const std::string &type_url, const std::string &version_info);
     };
 

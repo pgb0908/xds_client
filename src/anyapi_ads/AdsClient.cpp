@@ -45,15 +45,23 @@ namespace anyapi {
         state->resourceDecoderPtr_ = std::make_shared<ResourceDecoderImpl<envoy::config::cluster::v3::Cluster>>("name");
 
         // request-queue 요청 집어넣음
-        request_queue_.push(state.get());
+        request_queue_.push(state->key_.type_url_);
 
         states_.emplace(state->key_.type_url_, std::move(state));
 
         std::cout << "subscribeCDS" << std::endl;
     }
 
-    void AdsClient::subscribeEDS() {
-
+    void AdsClient::subscribeEDS(const std::vector<DecodedResourcePtr>& resources) {
+        auto new_state = std::make_unique<State>();
+        new_state->key_.name_ = "eds";
+        new_state->key_.type_url_ = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment";
+        new_state->resourceDecoderPtr_ = std::make_shared<ResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name");
+        for (const auto &resource: resources) {
+            new_state->watched_resources_.push_back(resource->name_);
+        }
+        request_queue_.push(new_state->key_.type_url_);
+        states_.emplace(new_state->key_.type_url_, std::move(new_state));
     }
 
     void AdsClient::detectingQueue() {
@@ -62,7 +70,7 @@ namespace anyapi {
         if(!request_queue_.empty()){
             while(!request_queue_.empty()){
                 auto state = request_queue_.front();
-                auto ok = sendDiscoveryRequest(*state);
+                auto ok = sendDiscoveryRequest(state);
 
                 request_queue_.pop();
             }
@@ -78,35 +86,42 @@ namespace anyapi {
         subscribeCDS();
     }
 
-    bool AdsClient::sendDiscoveryRequest(State &state) {
-        auto type_url = state.key_.type_url_;
-        std::cout << "sendling Discovery-Request : " << state.key_.type_url_ << std::endl;
+    bool AdsClient::sendDiscoveryRequest(std::string& type_url) {
+        auto state = states_[type_url].get();
+        std::cout << "sendling Discovery-Request : " << type_url << std::endl;
 
-        state.discoveryRequest_.mutable_resource_names()->Clear();
+        state->discoveryRequest_.mutable_resource_names()->Clear();
 
         // 중복된 리소스를 제외하고 request의 리소스를 업데이트
+        std::set<std::string> resources;
+        for (const auto& watchedResource : state->watched_resources_) {
+            if (resources.count(watchedResource) == 0) {
+                resources.emplace(watchedResource);
+                state->discoveryRequest_.add_resource_names(watchedResource);
+            }
+        }
 
-        if (!state.subscribed_) {
-            state.discoveryRequest_.set_type_url(type_url);
-            state.subscribed_ = true;
-            state.discoveryRequest_.mutable_node()->CopyFrom(node());
+        if (!state->subscribed_) {
+            state->discoveryRequest_.set_type_url(type_url);
+            state->subscribed_ = true;
+            state->discoveryRequest_.mutable_node()->CopyFrom(node());
         } else {
-            state.discoveryRequest_.clear_node();
+            state->discoveryRequest_.clear_node();
         }
 
         std::cout << "---------------- request ------------------" << std::endl;
-        std::cout << state.discoveryRequest_.DebugString();
+        std::cout << state->discoveryRequest_.DebugString();
         std::cout << "--------------- request -------------------" << std::endl;
 
 
         void *on_tag;
         bool ok = false;
-        rpc_->Write(state.discoveryRequest_, &on_tag);
+        rpc_->Write(state->discoveryRequest_, &on_tag);
         cq_.Next(&on_tag, &ok);
 
         // clear error_detail after the request is sent if it exists.
-        if (state.discoveryRequest_.has_error_detail()) {
-            state.discoveryRequest_.clear_error_detail();
+        if (state->discoveryRequest_.has_error_detail()) {
+            state->discoveryRequest_.clear_error_detail();
         }
 
         return ok;
@@ -114,9 +129,9 @@ namespace anyapi {
 
     void AdsClient::processResponse(const DiscoveryResponse &discoveryResponse) {
         const std::string &type_url = discoveryResponse.type_url();
-/*        std::cout << "---------------- response ------------------" << std::endl;
+        std::cout << "---------------- response ------------------" << std::endl;
         std::cout << discoveryResponse.DebugString();
-        std::cout << "--------------- response -------------------" << std::endl;*/
+        std::cout << "--------------- response -------------------" << std::endl;
 
         if (states_.count(type_url) == 0) {
             std::cout << "Ignoring the message for type URL " << type_url << "as it has no current subscribers."
@@ -141,7 +156,7 @@ namespace anyapi {
                 // updating the version).
                 //ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
                 std::cout << "Ignoring unwatched type URL " << type_url << std::endl;
-                //queueDiscoveryRequest(type_url);
+                request_queue_.push(api_state->second->key_.type_url_);
             }
 
             return;
@@ -172,12 +187,11 @@ namespace anyapi {
                 auto decoded_resource = std::make_unique<DecodedResource>();
                 auto resource_name = api_state->second->resourceDecoderPtr_->resourceName(*decoded);
 
+
                 decoded_resource->has_resource_ = true;
                 decoded_resource->version_ = discoveryResponse.version_info();
                 decoded_resource->resource_ = std::move(decoded);
                 decoded_resource->name_ = resource_name;
-
-                std::cout << "resource debug : " << decoded_resource->resource_->DebugString() << std::endl;
 
                 if (!isHeartbeatResource(type_url, *decoded_resource)) {
                     resources.emplace_back(std::move(decoded_resource));
@@ -197,8 +211,9 @@ namespace anyapi {
 
         api_state->second->discoveryRequest_.set_response_nonce(discoveryResponse.nonce());
 
-        // request-queue 요청 집어넣음
-        request_queue_.push(api_state->second.get());
+        // 응답에 대한 답변으로
+        // request-queue에 새로운 요청 생성
+        request_queue_.push(api_state->second->key_.type_url_);
     }
 
 
@@ -245,19 +260,18 @@ namespace anyapi {
         }
 
         for(auto& watch : states_){
-            if (watch.second->resources_.empty()) {
+            if (watch.second->watched_resources_.empty()) {
                 // 모든 config 적용
                 // all_resource_refs 적용
 
-
                 // cds이면 eds에 대한 구독요청을 큐에 집어 넣음
-
+                subscribeEDS(resources);
 
                 continue;
             }
 
             std::vector<std::reference_wrapper<DecodedResource>> found_resources;
-            for (const auto &watched_resource_name: watch.second->resources_) {
+            for (const auto &watched_resource_name: watch.second->watched_resources_) {
                 // Look for a singleton subscription.
                 auto it = resource_ref_map.find(watched_resource_name);
                 if (it != resource_ref_map.end()) {
