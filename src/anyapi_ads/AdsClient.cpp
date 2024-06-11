@@ -77,7 +77,6 @@ namespace anyapi {
 
         }else{
             // request-queue 아무것도 없다면 listen-mode
-
             receiveResponse();
         }
     }
@@ -223,6 +222,7 @@ namespace anyapi {
 
         std::cout << "receiveResponse" << std::endl;
         DiscoveryResponse discoveryResponse;
+
         rpc_->Read(&discoveryResponse, &on_tag);
         cq_.Next(&on_tag, &ok);
 
@@ -241,8 +241,10 @@ namespace anyapi {
 
         // cds이면 eds에 대한 구독요청을 큐에 집어 넣음
         if(state.key_.name_ == "cds"){
+            // cluster의 config 파싱
 
-            // cluster의 타입이 EDS인 경우에만 EDS 후속 진행
+
+            // cluster의 타입이 EDS인 경우에만 EDS 구독
             subscribeEDS(resources);
         }
 
