@@ -127,18 +127,19 @@ namespace anyapi{
         std::string type_url_;
     };
 
-    struct State {
-        ResourceKey key_;
-        DiscoveryRequest discoveryRequest_;
-        bool subscribed_{false};
-        std::shared_ptr<ResourceDecoder> resourceDecoderPtr_;
-    };
-
     struct DecodedResource {
         bool has_resource_{false};
         std::string name_;
         std::string version_;
         std::unique_ptr<google::protobuf::Message> resource_;
+    };
+
+    struct State {
+        ResourceKey key_;
+        DiscoveryRequest discoveryRequest_;
+        bool subscribed_{false};
+        std::shared_ptr<ResourceDecoder> resourceDecoderPtr_;
+        std::vector<std::string> resources_;
     };
 
     using DecodedResourcePtr = std::unique_ptr<DecodedResource>;
@@ -162,15 +163,20 @@ namespace anyapi{
         void processResponse(const DiscoveryResponse& discoveryResponse);
         void clearNonce();
 
+        bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
+            return !resource.has_resource_&&
+                   resource.version_ == states_[type_url].discoveryRequest_.version_info();
+        }
+
         std::map<std::string, State> states_; // type_url, state
-        std::map<std::string, DecodedResource> resource_map;  // type_url, DecodedResource
+        //std::map<std::string, DecodedResource> resource_map;  // type_url, DecodedResource
 
         std::unique_ptr<AggregatedDiscoveryService::Stub> stub_;
         std::unique_ptr< ::grpc::ClientAsyncReaderWriter<DiscoveryRequest, DiscoveryResponse>> rpc_;
         grpc::CompletionQueue cq_;
         grpc::Status status_;
         ClientContext context_;
-
+        std::queue<State> request_queue_;
 
 
         google::protobuf::Struct build_struct(const std::vector<std::pair<std::string,std::string>>& keyValue){

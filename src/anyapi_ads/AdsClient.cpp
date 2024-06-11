@@ -44,16 +44,11 @@ namespace anyapi {
         state.key_.type_url_ = "type.googleapis.com/envoy.config.cluster.v3.Cluster";
         state.resourceDecoderPtr_ = std::make_shared<ResourceDecoderImpl<envoy::config::cluster::v3::Cluster>>("name");
         states_.emplace(state.key_.type_url_, state);
-        auto ok = sendDiscoveryRequest(state);
 
-        if (ok) {
-            receiveResponse();
-            std::cout << "rpc write success!!!" << std::endl;
-        } else {
-            std::cout << "rpc write fail!!!" << std::endl;
-        }
+        std::cout << "subscribeCDS" << std::endl;
 
-        ok = sendDiscoveryRequest(state);
+        // request-queue 요청 집어넣음
+        request_queue_.push(state);
     }
 
     void AdsClient::subscribeEDS() {
@@ -61,17 +56,20 @@ namespace anyapi {
     }
 
     void AdsClient::detectingQueue() {
-        void *on_tag;
-        bool ok;
 
-        DiscoveryResponse discoveryResponse;
-        rpc_->Read(&discoveryResponse, &on_tag);
-        cq_.Next(&on_tag, &ok);
+        // request-queue 감지
+        if(!request_queue_.empty()){
+            while(!request_queue_.empty()){
+                auto state = request_queue_.front();
+                auto ok = sendDiscoveryRequest(state);
 
-        if (on_tag) {
-            std::cout << "rpc read success!!!" << std::endl;
-        } else {
-            std::cout << "rpc read fail!!!" << std::endl;
+                request_queue_.pop();
+            }
+
+        }else{
+            // request-queue 아무것도 없다면 listen-mode
+
+            receiveResponse();
         }
     }
 
@@ -115,9 +113,9 @@ namespace anyapi {
 
     void AdsClient::processResponse(const DiscoveryResponse &discoveryResponse) {
         const std::string &type_url = discoveryResponse.type_url();
-        std::cout << "---------------- response ------------------" << std::endl;
+/*        std::cout << "---------------- response ------------------" << std::endl;
         std::cout << discoveryResponse.DebugString();
-        std::cout << "--------------- response -------------------" << std::endl;
+        std::cout << "--------------- response -------------------" << std::endl;*/
 
         if (states_.count(type_url) == 0) {
             std::cout << "Ignoring the message for type URL " << type_url << "as it has no current subscribers."
@@ -166,13 +164,23 @@ namespace anyapi {
                     throw std::runtime_error(ss.str());
                 }
 
-                auto decoded_resource = api_state->second.resourceDecoderPtr_->decodeResource(resource);
+                auto decoded = api_state->second.resourceDecoderPtr_->decodeResource(resource);
+                std::cout << "---------------- decoded resource ------------------" << std::endl;
+                std::cout << decoded->DebugString() << std::endl;
 
-                std::cout << "resource debug : " << decoded_resource->DebugString() << std::endl;
+                auto decoded_resource = std::make_unique<DecodedResource>();
+                auto resource_name = api_state->second.resourceDecoderPtr_->resourceName(*decoded);
 
-/*                if (!isHeartbeatResource(type_url, *decoded_resource)) {
+                decoded_resource->has_resource_ = true;
+                decoded_resource->version_ = discoveryResponse.version_info();
+                decoded_resource->resource_ = std::move(decoded);
+                decoded_resource->name_ = resource_name;
+
+                std::cout << "resource debug : " << decoded_resource->resource_->DebugString() << std::endl;
+
+                if (!isHeartbeatResource(type_url, *decoded_resource)) {
                     resources.emplace_back(std::move(decoded_resource));
-                }*/
+                }
 
             }
 
@@ -186,6 +194,9 @@ namespace anyapi {
         }
 
         api_state->second.discoveryRequest_.set_response_nonce(discoveryResponse.nonce());
+
+        // request-queue 요청 집어넣음
+        request_queue_.push(api_state->second);
     }
 
 
@@ -193,6 +204,7 @@ namespace anyapi {
         void *on_tag;
         bool ok;
 
+        std::cout << "receiveResponse" << std::endl;
         DiscoveryResponse discoveryResponse;
         rpc_->Read(&discoveryResponse, &on_tag);
         cq_.Next(&on_tag, &ok);
@@ -227,84 +239,50 @@ namespace anyapi {
         }*/
 
             all_resource_refs.emplace_back(*resource);
-
-/*        if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
-            // Sort the context params of an xdstp resource, so we can compare them easily.
-            auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource->name());
-            THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
-            xds::core::v3::ResourceName xdstp_resource = resource_or_error.value();
-            XdsResourceIdentifier::EncodeOptions options;
-            options.sort_context_params_ = true;
-            resource_ref_map.emplace(XdsResourceIdentifier::encodeUrn(xdstp_resource, options),
-                                     *resource);
-        } else {
-            resource_ref_map.emplace(resource->name(), *resource);
-        }*/
-
             resource_ref_map.emplace(resource->name_, *resource);
         }
 
-        // Execute external config validators if there are any watches.
-/*    if (!api_state.watches_.empty()) {
-        config_validators_->executeValidators(type_url, resources);
-    }*/
+        for(auto& watch : states_){
+            if (watch.second.resources_.empty()) {
+                // 모든 config 적용
+                // all_resource_refs 적용
 
-/*        for (auto watch: api_state.watches_) {
-            // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
-            // Listener) even if the message does not have resources so that update_empty stat
-            // is properly incremented and state-of-the-world semantics are maintained.
-            if (watch->resources_.empty()) {
-                //THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(all_resource_refs, version_info));
-                /// watch를 통해 관련 config 업데이트 함
+
+                // cds이면 eds에 대한 구독요청을 큐에 집어 넣음
+
+
                 continue;
             }
+
             std::vector<std::reference_wrapper<DecodedResource>> found_resources;
-            for (const auto &watched_resource_name: watch->resources_) {
+            for (const auto &watched_resource_name: watch.second.resources_) {
                 // Look for a singleton subscription.
                 auto it = resource_ref_map.find(watched_resource_name);
                 if (it != resource_ref_map.end()) {
                     found_resources.emplace_back(it->second);
-                } else if (isXdsTpWildcard(watched_resource_name)) {
-                    // See if the resources match the xdstp wildcard subscription.
-                    // Note: although it is unlikely that Envoy will need to support a resource that is mapped
-                    // to both a singleton and collection watch, this code still supports this use case.
-                    // TODO(abeyad): This could be made more efficient, e.g. by pre-computing and having a map
-                    // entry for each wildcard watch.
-                    for (const auto &resource_ref_it: resource_ref_map) {
-                        if (XdsResourceIdentifier::hasXdsTpScheme(resource_ref_it.first) &&
-                            convertToWildcard(resource_ref_it.first) == watched_resource_name) {
-                            found_resources.emplace_back(resource_ref_it.second);
-                        }
-                    }
                 }
-            }*/
-
-        // onConfigUpdate should be called only on watches(clusters/listeners) that have
-        // updates in the message for EDS/RDS.
-/*        if (!found_resources.empty()) {
-            //THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(found_resources, version_info));
-            // Resource cache is only used for EDS resources.
-            if (eds_resources_cache_ &&
-                (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
-                for (const auto& resource : found_resources) {
-                    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
-                            dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                                    resource.get().resource());
-                    eds_resources_cache_->setResource(resource.get().name(), cluster_load_assignment);
-                }
-                // No need to remove resources from the cache, as currently only non-collection
-                // subscriptions are supported, and these resources are removed in the call
-                // to updateWatchInterest().
             }
-        }*/
-        //}
 
-        // All config updates have been applied without throwing an exception, so we'll call the xDS
-        // resources delegate, if any.
-/*    if (call_delegate && xds_resources_delegate_.has_value()) {
-        xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId{target_xds_authority_, type_url},
-                                                 all_resource_refs);
-    }*/
+            // onConfigUpdate should be called only on watches(clusters/listeners) that have
+            // updates in the message for EDS/RDS.
+            if (!found_resources.empty()) {
+                // Resource cache is only used for EDS resources.
+/*                if (type_url == "type.googleapis.com/envoy::config::endpoint::v3::ClusterLoadAssignment") {
+                    for (const auto &resource: found_resources) {
+                        const envoy::config::endpoint::v3::ClusterLoadAssignment &cluster_load_assignment =
+                                dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment &>(
+                                        resource.get().resource_);
+                        eds_resources_cache_->setResource(resource.get().name_, cluster_load_assignment);
+                    }
+                    // No need to remove resources from the cache, as currently only non-collection
+                    // subscriptions are supported, and these resources are removed in the call
+                    // to updateWatchInterest().
+                }*/
+            }
+        }
+
+
+
 
         state.discoveryRequest_.set_version_info(version_info);
     }

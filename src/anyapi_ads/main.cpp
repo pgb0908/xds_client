@@ -11,7 +11,11 @@ int main(){
 
     client.startSubscribe();
 
-    client.detectingQueue();
+    while(1){
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        client.detectingQueue();
+    }
+
 
 
     return 0;
