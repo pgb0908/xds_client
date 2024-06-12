@@ -66,19 +66,23 @@ namespace anyapi {
 
     void AdsClient::detectingQueue() {
 
-        // request-queue 감지
-        if(!request_queue_.empty()){
-            while(!request_queue_.empty()){
-                auto state = request_queue_.front();
-                auto ok = sendDiscoveryRequest(state);
+        while(1){
+            // request-queue 감지
+            if(!request_queue_.empty()){
+                while(!request_queue_.empty()){
+                    auto state = request_queue_.front();
+                    auto ok = sendDiscoveryRequest(state);
 
-                request_queue_.pop();
+                    request_queue_.pop();
+                }
+
+            }else{
+                // request-queue 아무것도 없다면 listen-mode
+                receiveResponse();
             }
-
-        }else{
-            // request-queue 아무것도 없다면 listen-mode
-            receiveResponse();
         }
+
+
     }
 
     void AdsClient::startSubscribe() {
