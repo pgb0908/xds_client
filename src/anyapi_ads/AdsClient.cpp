@@ -277,6 +277,8 @@ namespace anyapi {
             return update_flag;
         }
 
+        update_flag = true;
+
         for(auto& resource : resources){
             if(resource->has_resource_){
                 if(ds_type == CDS){
@@ -291,6 +293,8 @@ namespace anyapi {
                 }
             }
         }
+
+        // todo cds/eds resrouce를 em에게 전송
 
 
 
