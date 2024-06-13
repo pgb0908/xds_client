@@ -12,8 +12,7 @@
 #include "envoy/service/discovery/v3/ads.grpc.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "Protobuf.h"
-#include "CdsResource.h"
-#include "EdsResource.h"
+#include "ResourceCache.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -178,8 +177,8 @@ namespace anyapi{
 
         void clearNonce();
 
-        std::unique_ptr<CdsResource> cdsResourcePtr_;
-        std::unique_ptr<EdsResource> edsResourcePtr_;
+        std::unique_ptr<ResourceCache<envoy::config::cluster::v3::Cluster>> cdsResourcePtr_;
+        std::unique_ptr<ResourceCache<envoy::config::endpoint::v3::ClusterLoadAssignment>> edsResourcePtr_;
 
         bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
             return !resource.has_resource_&&

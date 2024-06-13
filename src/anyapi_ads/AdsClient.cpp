@@ -20,8 +20,8 @@ namespace anyapi {
         return ss.str();
     }
 
-    AdsClient::AdsClient(std::string& endpoint) : cdsResourcePtr_(std::make_unique<CdsResource>()),
-    edsResourcePtr_(std::make_unique<EdsResource>()) {
+    AdsClient::AdsClient(std::string& endpoint) : cdsResourcePtr_(std::make_unique<ResourceCache<envoy::config::cluster::v3::Cluster>>()),
+    edsResourcePtr_(std::make_unique<ResourceCache<envoy::config::endpoint::v3::ClusterLoadAssignment>>()) {
         stub_ = AggregatedDiscoveryService::NewStub(grpc::CreateChannel(endpoint,
                                                                         grpc::InsecureChannelCredentials()));
         rpc_ = stub_->PrepareAsyncStreamAggregatedResources(&context_, &cq_);
