@@ -247,13 +247,21 @@ namespace anyapi {
 
         // cds이면 eds에 대한 구독요청을 큐에 집어 넣음
         if(state.key_.name_ == CDS){
-            // cluster의 타입이 EDS인 경우에만 EDS 구독
             subscribeEDS(resources);
 
-            checkAndUpdateConfig(resources, type_url, version_info,CDS);
+            auto isUpdate = checkAndUpdateConfig(resources, type_url, version_info,CDS);
+            if(isUpdate){
+                // todo cds/eds resrouce를 em에게 전송
+
+            }
         }
         else if(state.key_.name_ == EDS){
-            checkAndUpdateConfig(resources, type_url, version_info,EDS);
+            auto isUpdate = checkAndUpdateConfig(resources, type_url, version_info,EDS);
+
+            if(isUpdate){
+                // todo cds/eds resrouce를 em에게 전송
+
+            }
         }else{
             // 나올 수 없는 경우
         }
@@ -293,10 +301,6 @@ namespace anyapi {
                 }
             }
         }
-
-        // todo cds/eds resrouce를 em에게 전송
-
-
 
         return update_flag;
     }
