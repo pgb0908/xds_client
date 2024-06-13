@@ -6,6 +6,7 @@
 #include "../ads_protocol_client/Status.h"
 #include "sstream"
 
+
 namespace anyapi {
 
     std::string truncateGrpcStatusMessage(std::string error_message) {
@@ -19,7 +20,8 @@ namespace anyapi {
         return ss.str();
     }
 
-    AdsClient::AdsClient(std::string& endpoint) {
+    AdsClient::AdsClient(std::string& endpoint) : cdsResourcePtr_(std::make_unique<CdsResource>()),
+    edsResourcePtr_(std::make_unique<EdsResource>()) {
         stub_ = AggregatedDiscoveryService::NewStub(grpc::CreateChannel(endpoint,
                                                                         grpc::InsecureChannelCredentials()));
         rpc_ = stub_->PrepareAsyncStreamAggregatedResources(&context_, &cq_);
@@ -168,6 +170,7 @@ namespace anyapi {
 
         try {
             std::vector<DecodedResourcePtr> resources;
+            std::vector<std::unique_ptr<google::protobuf::Message>> decoded_messages;
             auto resource_decoder = api_state->second->resourceDecoderPtr_;
 
             for (const auto &resource: discoveryResponse.resources()) {
@@ -184,22 +187,22 @@ namespace anyapi {
                 }
 
                 auto decoded = api_state->second->resourceDecoderPtr_->decodeResource(resource);
+
                 std::cout << "---------------- decoded resource ------------------" << std::endl;
                 std::cout << decoded->DebugString() << std::endl;
 
-                auto decoded_resource = std::make_unique<DecodedResource>();
+                auto decoded_resource = std::make_unique<DecodedResource>(*decoded);
                 auto resource_name = api_state->second->resourceDecoderPtr_->resourceName(*decoded);
-
 
                 decoded_resource->has_resource_ = true;
                 decoded_resource->version_ = discoveryResponse.version_info();
-                decoded_resource->resource_ = std::move(decoded);
                 decoded_resource->name_ = resource_name;
 
                 if (!isHeartbeatResource(type_url, *decoded_resource)) {
                     resources.emplace_back(std::move(decoded_resource));
                 }
 
+                decoded_messages.push_back(std::move(decoded));
             }
 
             resourceUpdate(resources, *(api_state->second),
@@ -242,14 +245,17 @@ namespace anyapi {
     AdsClient::resourceUpdate(const std::vector<DecodedResourcePtr> &resources, State &state,
                               const std::string &type_url, const std::string &version_info) {
 
-
         // cds이면 eds에 대한 구독요청을 큐에 집어 넣음
-        if(state.key_.name_ == "cds"){
-            // cluster의 config 파싱
-
-
+        if(state.key_.name_ == CDS){
             // cluster의 타입이 EDS인 경우에만 EDS 구독
             subscribeEDS(resources);
+
+            checkAndUpdateConfig(resources, type_url, version_info,CDS);
+        }
+        else if(state.key_.name_ == EDS){
+            checkAndUpdateConfig(resources, type_url, version_info,EDS);
+        }else{
+            // 나올 수 없는 경우
         }
 
         state.discoveryRequest_.set_version_info(version_info);
@@ -262,7 +268,40 @@ namespace anyapi {
         }
     }
 
+    bool AdsClient::checkAndUpdateConfig(const std::vector<DecodedResourcePtr> &resources, const std::string &type_url,
+                                         const std::string &version_info, const std::string& ds_type) {
+        bool update_flag = false;
+        auto old_version = states_[type_url]->discoveryRequest_.version_info();
 
+        if(version_info == old_version){
+            return update_flag;
+        }
+
+        for(auto& resource : resources){
+            if(resource->has_resource_){
+                if(ds_type == CDS){
+                    const auto& cluster = dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource->resource_);
+                    cdsResourcePtr_->setResource(resource->name_, cluster);
+                }
+
+                if(ds_type == EDS){
+                    const auto& cluster_load_assignment =
+                            dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(resource->resource_);
+                    edsResourcePtr_->setResource(resource->name_, cluster_load_assignment);
+                }
+            }
+        }
+
+
+
+        return update_flag;
+    }
+
+
+    DecodedResource::DecodedResource(google::protobuf::Message &resource) :
+    resource_(resource) {
+
+    }
 }
 
 

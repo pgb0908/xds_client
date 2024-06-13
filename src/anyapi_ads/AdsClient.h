@@ -12,6 +12,8 @@
 #include "envoy/service/discovery/v3/ads.grpc.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "Protobuf.h"
+#include "CdsResource.h"
+#include "EdsResource.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -25,6 +27,11 @@ using envoy::config::core::v3::Node;
 
 
 namespace anyapi{
+
+    const std::string CDS = "cds";
+    const std::string EDS = "eds";
+    const std::string LDS = "lds";
+    const std::string RDS = "rds";
 
     static void unpackToOrThrow(const google::protobuf::Any& any_message, google::protobuf::Message& message) {
         if (!message.ParseFromString(any_message.value())) {
@@ -128,10 +135,12 @@ namespace anyapi{
     };
 
     struct DecodedResource {
+        DecodedResource(google::protobuf::Message &resource);
+
         bool has_resource_{false};
         std::string name_;
         std::string version_;
-        std::unique_ptr<google::protobuf::Message> resource_;
+        const google::protobuf::Message& resource_;
     };
 
     struct State {
@@ -161,7 +170,16 @@ namespace anyapi{
 
         void receiveResponse();
         void processResponse(const DiscoveryResponse& discoveryResponse);
+        void resourceUpdate(const std::vector<DecodedResourcePtr>& resources, State& state,
+                            const std::string &type_url, const std::string &version_info);
+
+        bool checkAndUpdateConfig(const std::vector<DecodedResourcePtr> &resources, const std::string &type_url,
+                                  const std::string &version_info, const std::string& ds_type);
+
         void clearNonce();
+
+        std::unique_ptr<CdsResource> cdsResourcePtr_;
+        std::unique_ptr<EdsResource> edsResourcePtr_;
 
         bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
             return !resource.has_resource_&&
@@ -203,9 +221,6 @@ namespace anyapi{
 
             return node;
         }
-
-        void resourceUpdate(const std::vector<DecodedResourcePtr>& resources, State& state,
-                            const std::string &type_url, const std::string &version_info);
     };
 
 }
